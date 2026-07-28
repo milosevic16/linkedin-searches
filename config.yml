@@ -117,36 +117,39 @@ search:
   # Options: past-24h, past-week, past-month
   fresh_window: past-24h
 
-  # ── Searching for individual posts (currently OFF) ──────────────────
-  # Whether to also go looking for specific posts and draft comments on
-  # them. This is off because it does not work well enough to pay for:
-  # search engines index LinkedIn months late. A measured run returned
-  # nothing newer than 112 days old, and most results were far older —
-  # while LinkedIn engagement is over within about 48 hours. So it costs
-  # roughly EUR 1.10 a refresh to surface posts not worth commenting on.
-  #
-  # The live search links above are unaffected. They query LinkedIn
-  # directly and are genuinely current every time you click them.
-  #
-  # Set to true to turn it back on — but raise notable_max_age_hours too,
-  # or the age limit will (correctly) discard everything it finds.
-  find_posts: false
+  # ── Finding posts to comment on ─────────────────────────────────────
+  # Where posts come from:
+  #   apify  LinkedIn's own post search, via a scraping service. Sees posts
+  #          minutes old. Costs about $2 per 1000 posts; Apify's free plan
+  #          includes $5 of credit a month. Needs the APIFY_TOKEN secret.
+  #   web    Claude's web search tool. Free of any extra service, but search
+  #          engines index LinkedIn months late — a measured run returned
+  #          nothing newer than 112 days. Kept only as a fallback if the
+  #          scraping service disappears.
+  provider: apify
 
-  # Hard age limit, enforced in code against the date encoded in each
-  # post's own URL — not left to the model, which cannot see a
-  # publication date. Anything older, or with no verifiable date, is
-  # discarded before it reaches the AI. Only used when find_posts is true.
+  # Whether to look for individual posts at all. With provider: web this is
+  # not worth paying for; with apify it is the point of the tool.
+  find_posts: true
+
+  # Hard age limit, enforced in code against the date encoded in each post's
+  # own URL — never left to the model, which cannot see a publication date.
+  # Anything older, or with no verifiable date, is discarded before it costs
+  # a single AI token. LinkedIn engagement is over in roughly 48 hours, so
+  # there is little point raising this much above 24.
   notable_max_age_hours: 24
+
+  # How many posts to fetch per keyword. This is the cost dial for Apify:
+  # 11 keywords x 20 = 220 posts, about $0.44 a refresh, so the free $5/month
+  # covers roughly 10 refreshes. Raise it to widen the net, at that rate.
+  posts_per_keyword: 20
+
+  # newest first, so the age limit keeps the most posts
+  sort_by: date
 
   include_articles: true     # also match linkedin.com/pulse articles
 
-  # Web searches run per keyword, each with a different phrasing.
-  # A single search returns a limited number of results (~10) and that count
-  # is NOT adjustable — so if you want MORE posts found, raise this number.
-  #
-  # COST: this is the expensive dial. Beyond the ~1c per search itself, every
-  # result the search returns is billed as input, and a long search turn gets
-  # re-sent when it resumes. Raising this raises the bill faster than linearly.
+  # Only used when provider is "web".
   searches_per_keyword: 2
 
 # Posts scoring below this (0-10) are tucked into a collapsed section.
@@ -155,18 +158,20 @@ min_relevance: 5
 # Cost control: at most this many posts get AI scoring + drafts per run.
 max_enriched: 30
 
-# Model that writes the comment angles for each topic — with post search
-# off, the only model call a refresh makes. Writing three talking points
-# is not a hard task, so it runs on the cheapest model. If the angles
-# start reading as generic, try claude-sonnet-5; the difference is a few
-# cents either way.
+# ── Models ────────────────────────────────────────────────────────────
+# Reusable comment angles per topic. Not a hard task, so: cheapest.
 angles_model: claude-haiku-4-5
 
-# Used only when find_posts is true: scoring posts and drafting the
-# per-post comments — the part whose quality you would actually read.
-model: claude-opus-5
+# Deciding which posts are worth commenting on. Runs over every post that
+# survived the date and keyword filters, and with the real post text in
+# front of it this is an easy judgement — so also the cheapest model.
+score_model: claude-haiku-4-5
 
-# Used only when find_posts is true: running the searches and listing what
-# came back. Cheaper, because that step is mechanical. This cannot be
-# Haiku — the search tool requires Sonnet 4.6+ / Opus 4.6+.
+# Writing the actual comments. Only runs for posts that cleared
+# min_relevance, so it is a fraction of the input — worth a better model,
+# because this is the text you read and paste. Try claude-haiku-4-5 if you
+# want it cheaper still and cannot tell the difference.
+model: claude-sonnet-5
+
+# Only used when search.provider is "web".
 search_model: claude-sonnet-5

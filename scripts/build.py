@@ -29,8 +29,18 @@ import store
 from enrich import enrich_posts
 from launcher import build_launcher
 from render import render
-from search_claude import search_posts
 from usage import Usage
+
+
+def _search_provider(cfg: dict):
+    """Where posts come from. Kept swappable because these vendors are not
+    permanent — Proxycurl was sued by LinkedIn and shut down in 2025."""
+    name = ((cfg.get("search") or {}).get("provider") or "apify").lower()
+    if name == "web":
+        from search_claude import search_posts  # Claude's web search tool
+        return search_posts, "web search"
+    from search_apify import search_posts       # LinkedIn's own search, via Apify
+    return search_posts, "Apify"
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -119,9 +129,11 @@ def main() -> int:
         #    recent enough to be worth commenting on. See find_posts in
         #    config.yml.
         if (cfg.get("search") or {}).get("find_posts", False):
+            search_posts, source = _search_provider(cfg)
+            print(f"Searching for posts via {source}.")
             posts, w = search_posts(cfg, usage=usage)
             warnings += w
-            print(f"Found {len(posts)} posts within the age limit.")
+            print(f"{len(posts)} posts passed the date and keyword filters.")
 
             posts, w = enrich_posts(posts, cfg, usage=usage)
             warnings += w

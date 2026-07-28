@@ -62,10 +62,27 @@ class _Step:
 
 
 @dataclass
+class _External:
+    """Spend with someone other than Anthropic — it lands on a different bill,
+    but it is part of what a refresh costs and belongs in the same total."""
+
+    units: int = 0
+    unit_label: str = "items"
+    usd: float = 0.0
+
+
+@dataclass
 class Usage:
     """Accumulates usage across a build. One instance per run."""
 
     steps: dict[str, _Step] = field(default_factory=dict)
+    external: dict[str, _External] = field(default_factory=dict)
+
+    def record_external(self, service: str, units: int, usd_per_1000: float,
+                        unit_label: str = "posts") -> None:
+        entry = self.external.setdefault(service, _External(unit_label=unit_label))
+        entry.units += units
+        entry.usd += units * usd_per_1000 / 1000
 
     def record(self, step: str, model: str, response) -> None:
         """Fold one API response into the running totals. Never raises —
@@ -86,7 +103,7 @@ class Usage:
 
     @property
     def total_usd(self) -> float:
-        return sum(s.usd for s in self.steps.values())
+        return sum(s.usd for s in self.steps.values()) + sum(e.usd for e in self.external.values())
 
     @property
     def total_eur(self) -> float:
@@ -99,6 +116,10 @@ class Usage:
             "eur": round(self.total_eur, 4),
             "calls": sum(s.calls for s in self.steps.values()),
             "searches": sum(s.searches for s in self.steps.values()),
+            "external": {
+                name: {"units": e.units, "unit_label": e.unit_label, "usd": round(e.usd, 4)}
+                for name, e in self.external.items()
+            },
             "steps": {
                 name: {
                     "model": s.model,
@@ -116,8 +137,8 @@ class Usage:
 
     def report(self) -> str:
         """A table for the build log."""
-        if not self.steps:
-            return "No Claude calls were made this run — nothing to bill."
+        if not self.steps and not self.external:
+            return "No paid calls were made this run — nothing to bill."
 
         head = (
             f"{'step':<10}{'model':<18}{'calls':>6}{'in':>9}{'cache wr':>10}"
@@ -130,11 +151,16 @@ class Usage:
                 f"{s.cache_read:>10,}{s.output:>8,}{s.searches:>6}{s.usd:>9.4f}"
             )
         lines.append("-" * len(head))
+        anthropic_usd = sum(s.usd for s in self.steps.values())
         lines.append(
-            f"{'TOTAL':<10}{'':<18}{sum(s.calls for s in self.steps.values()):>6}"
+            f"{'Anthropic':<10}{'':<18}{sum(s.calls for s in self.steps.values()):>6}"
             f"{'':>9}{'':>10}{'':>10}{'':>8}{sum(s.searches for s in self.steps.values()):>6}"
-            f"{self.total_usd:>9.4f}"
+            f"{anthropic_usd:>9.4f}"
         )
+        for name, e in self.external.items():
+            lines.append(f"{name:<10}{'(not Anthropic)':<18}{'':>6}{e.units:>9,} {e.unit_label:<28}{e.usd:>9.4f}")
+        lines.append("-" * len(head))
+        lines.append(f"{'TOTAL':<10}{'':<18}{'':>6}{'':>9}{'':>10}{'':>10}{'':>8}{'':>6}{self.total_usd:>9.4f}")
         lines.append(f"≈ EUR {self.total_eur:.4f} at {_USD_TO_EUR} EUR/USD (list prices, no discounts)")
         lines.append(self._cache_verdict())
         return "\n".join(lines)

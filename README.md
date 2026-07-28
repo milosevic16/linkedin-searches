@@ -15,13 +15,21 @@ Each topic gives you a **link into LinkedIn's own search**, pre-filtered to the
 last 24 hours and sorted newest-first, plus **3 reusable comment angles** to bring
 to whatever you find there.
 
-**Why it works this way.** LinkedIn blocks crawlers, so its own search is the only
-place recent posts exist. We measured the alternative: web search restricted to
-`linkedin.com` returned nothing newer than **112 days old**, most of it far older.
-Since LinkedIn engagement is over within about 48 hours, commenting on those earns
-nothing — so the tool no longer pays to find them (see `find_posts` in
-`config.yml`). Because we can't read the posts behind the live link, the angles
-are general rather than per-post; that's the honest trade.
+Underneath each topic sit the **posts found in the last 24 hours**, each with
+three comment drafts written for that specific post.
+
+**Where the posts come from.** LinkedIn blocks crawlers, so web search is useless
+here — we measured it, and it returned nothing newer than **112 days old**. Since
+LinkedIn engagement is over within about 48 hours, those were worthless. Posts now
+come from LinkedIn's own post search via [Apify](https://apify.com) (~$2 per 1,000
+posts; the free plan's $5/month covers roughly 10 refreshes). It needs no LinkedIn
+cookies, so your own account is never at risk.
+
+**Filters run in code, before any AI sees a post:** the publication date is decoded
+from the post's own URL and anything over 24 hours old is dropped, then anything
+matching no keyword is dropped. Only what survives costs model tokens. This matters
+— an earlier version left recency to the model, which cannot see a date, and put a
+post from 2023 on the dashboard with a relevance of 7.
 
 Timing matters: LinkedIn engagement decays within roughly 48 hours, so a comment
 on a months-old post earns very little. Work the live search links daily; treat

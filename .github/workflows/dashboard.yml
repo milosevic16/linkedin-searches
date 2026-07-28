@@ -66,6 +66,7 @@ jobs:
       - name: Build dashboard
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: python scripts/build.py ${{ steps.mode.outputs.flag }}
 
       # Persist the gathered posts so later rebuilds can skip the searching.

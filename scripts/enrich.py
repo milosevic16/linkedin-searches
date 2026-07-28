@@ -1,7 +1,13 @@
-"""Score posts for relevance and draft comment suggestions with Claude.
+"""Score posts for relevance, then draft comments for the ones worth it.
 
-Requires ANTHROPIC_API_KEY. If it is missing, posts are returned unscored
-and the dashboard simply lists them without drafts.
+Two passes on purpose, and on two different models. Scoring is a judgement
+call made over every post that survived the date and keyword filters, and it
+is cheap work — a small model reading real post text does it well. Drafting
+is the output you actually read, and it only runs for posts that cleared the
+relevance bar, so the better model is used on a fraction of the input.
+
+Doing both in one call, as this used to, meant paying the drafting model to
+also think about posts it was about to discard.
 """
 
 from __future__ import annotations
@@ -9,15 +15,14 @@ from __future__ import annotations
 import json
 import os
 
-CHUNK_SIZE = 8
+SCORE_CHUNK = 12   # scoring emits a line per post — batches can be larger
+DRAFT_CHUNK = 6    # drafting emits three comments per post — keep batches small
 
-# Caps on what we send per post. A search snippet is meant to be 2-3 sentences;
-# anything far beyond that is a runaway result, not signal worth paying for.
-_TITLE_CHARS = 300
-_SNIPPET_CHARS = 600
+# With a real post body rather than a search snippet, there is enough to judge
+# on. The cap only guards against a runaway result.
+_TEXT_CHARS = 2000
 
-# Structured-output schema: guarantees valid JSON back from the model.
-_SCHEMA = {
+_SCORE_SCHEMA = {
     "type": "object",
     "properties": {
         "evaluations": {
@@ -34,9 +39,28 @@ _SCHEMA = {
                         "type": "string",
                         "description": "One short sentence: why this score, in plain language.",
                     },
+                },
+                "required": ["id", "relevance", "reason"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["evaluations"],
+    "additionalProperties": False,
+}
+
+_DRAFT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "drafts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "description": "The post id from the input."},
                     "comments": {
                         "type": "array",
-                        "description": "Exactly 3 ready-to-adapt comment drafts written for THIS post, in the post's language.",
+                        "description": "Exactly 3 comment drafts written for THIS post, in the post's language.",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -51,17 +75,27 @@ _SCHEMA = {
                         },
                     },
                 },
-                "required": ["id", "relevance", "reason", "comments"],
+                "required": ["id", "comments"],
                 "additionalProperties": False,
             },
         }
     },
-    "required": ["evaluations"],
+    "required": ["drafts"],
     "additionalProperties": False,
 }
 
-_SYSTEM = """You help two professionals decide which LinkedIn posts to comment on, \
-and you draft the comments.
+_SCORE_SYSTEM = """You decide which LinkedIn posts are worth commenting on.
+
+Who is commenting, and why:
+{profile}
+
+For each post, score relevance 0-10: would a thoughtful comment from them on \
+this post plausibly be seen by their target audience and make them look good? \
+Penalise job ads, company self-promotion with no discussion value, and posts \
+that only mention a keyword in passing. Reward posts by relevant people that \
+invite discussion. Keep the reason to one plain sentence."""
+
+_DRAFT_SYSTEM = """You draft LinkedIn comments for two professionals.
 
 Who they are and why they comment:
 {profile}
@@ -69,55 +103,67 @@ Who they are and why they comment:
 Comment voice:
 {voice}
 
-For every post you receive (only a title/snippet is available, not the full text):
-- Score relevance 0-10: would a thoughtful comment from them on this post plausibly \
-be seen by their target audience and make them look good? Penalise job ads, \
-company self-promotion with no discussion value, and posts that merely mention a \
-keyword without substance. Reward posts by relevant people that invite discussion.
-- Write exactly 3 short comment drafts (each 1-3 sentences) in the SAME LANGUAGE \
-as the post: one adding an insight, one asking a good question, one sharing a \
-relatable angle or experience. Write them FOR THIS SPECIFIC POST — they should \
-respond to what this author actually said, not be generic commentary on the \
-topic. They must still stand on their own if the snippet is partial, so avoid \
-referring to specifics the snippet does not actually show.
-- Keep the "reason" to one plain sentence.
-"""
+For each post, write exactly 3 comment drafts (each 1-3 sentences) in the SAME \
+LANGUAGE as the post: one adding an insight, one asking a good question, one \
+sharing a relatable angle or experience. Write them FOR THIS SPECIFIC POST — \
+they must respond to what this author actually said, not be generic commentary \
+on the topic."""
 
 
-def _spread_across_topics(posts: list[dict], limit: int) -> list[dict]:
-    """Choose which posts get drafted, cycling through topics one at a time.
+def _payload(posts: list[dict], offset: int) -> str:
+    return json.dumps(
+        [
+            {
+                "id": offset + i,
+                "author": p.get("author") or "(unknown author)",
+                "hours_old": p.get("age_hours"),
+                "text": (p.get("snippet") or p.get("title") or "")[:_TEXT_CHARS],
+                "matched_keywords": p.get("keywords") or [],
+            }
+            for i, p in enumerate(posts)
+        ],
+        ensure_ascii=False,
+    )
 
-    Taking the first N in discovery order meant the keywords listed first in
-    config.yml ate the whole budget. Now that the dashboard is grouped by
-    topic that would leave later topics visibly empty, so spend the budget
-    round-robin: every topic gets its best post before any topic gets a
-    second one. Discovery order is preserved within a topic.
-    """
-    if len(posts) <= limit:
-        return list(posts)
 
-    buckets: dict[str, list[dict]] = {}
-    for post in posts:
-        primary = (post.get("keywords") or ["(unmatched)"])[0]
-        buckets.setdefault(primary, []).append(post)
+def _call(client, anthropic, model, system, schema, user_text, effort, usage, step, warnings):
+    """One structured-output call. Returns the parsed object, or None."""
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=8000,
+            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+            output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}},
+            messages=[{"role": "user", "content": user_text}],
+        )
+    except anthropic.RateLimitError:
+        warnings.append(f"Claude rate limit hit during {step} — some posts are incomplete.")
+        return None
+    except anthropic.APIStatusError as exc:
+        warnings.append(f"Claude API error {exc.status_code} during {step}.")
+        return None
+    except anthropic.APIConnectionError:
+        warnings.append(f"Could not reach the Claude API during {step}.")
+        return None
 
-    chosen: list[dict] = []
-    while len(chosen) < limit:
-        drained = True
-        for bucket in buckets.values():
-            if not bucket:
-                continue
-            chosen.append(bucket.pop(0))
-            drained = False
-            if len(chosen) >= limit:
-                break
-        if drained:  # every topic exhausted before we hit the limit
-            break
-    return chosen
+    if usage is not None:
+        usage.record(step, model, response)
+    if response.stop_reason == "refusal":
+        warnings.append(f"Claude declined one batch during {step}.")
+        return None
+    if response.stop_reason == "max_tokens":
+        warnings.append(f"One {step} batch was cut short — some posts may be incomplete.")
+
+    text = next((b.text for b in response.content if b.type == "text"), "")
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, AttributeError):
+        warnings.append(f"Could not parse one {step} batch.")
+        return None
 
 
 def enrich_posts(posts: list[dict], cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
-    """Attach relevance / reason / comments to each post, in place. Returns (posts, warnings)."""
+    """Attach relevance / reason, then comments to the posts that earn them."""
     warnings: list[str] = []
     if not posts:
         return posts, warnings
@@ -128,93 +174,53 @@ def enrich_posts(posts: list[dict], cfg: dict, usage=None) -> tuple[list[dict], 
     import anthropic  # imported lazily so --sample runs need no key/package config
 
     client = anthropic.Anthropic()
-    model = cfg.get("model") or "claude-opus-5"
-    system = _SYSTEM.format(
-        profile=(cfg.get("profile") or "").strip(),
-        voice=(cfg.get("voice") or "").strip(),
-    )
+    profile = (cfg.get("profile") or "").strip()
+    voice = (cfg.get("voice") or "").strip()
+    score_model = cfg.get("score_model") or "claude-haiku-4-5"
+    draft_model = cfg.get("model") or "claude-sonnet-5"
+    min_rel = int(cfg.get("min_relevance", 5))
 
     limit = int(cfg.get("max_enriched", 30))
-    targets = _spread_across_topics(posts, limit)
-    if len(posts) > len(targets):
-        warnings.append(
-            f"{len(targets)} of {len(posts)} posts were AI-scored, spread across topics (max_enriched)."
+    targets = posts[:limit]
+    if len(posts) > limit:
+        warnings.append(f"{limit} of {len(posts)} posts were scored (max_enriched).")
+
+    # ── Pass 1: score everything, on the cheap model ──────────────────
+    score_system = _SCORE_SYSTEM.format(profile=profile)
+    for start in range(0, len(targets), SCORE_CHUNK):
+        chunk = targets[start : start + SCORE_CHUNK]
+        parsed = _call(
+            client, anthropic, score_model, score_system, _SCORE_SCHEMA,
+            "Score these LinkedIn posts:\n" + _payload(chunk, start),
+            "low", usage, "score", warnings,
         )
-
-    for start in range(0, len(targets), CHUNK_SIZE):
-        chunk = targets[start : start + CHUNK_SIZE]
-        payload = [
-            {
-                "id": start + i,
-                "author": p.get("author") or "(unknown author)",
-                "title": (p.get("title") or "")[:_TITLE_CHARS],
-                "snippet": (p.get("snippet") or "")[:_SNIPPET_CHARS],
-                "matched_keywords": p.get("keywords") or [],
-            }
-            for i, p in enumerate(chunk)
-        ]
-        try:
-            response = client.messages.create(
-                model=model,
-                max_tokens=8000,
-                # The system prompt (profile + voice) is identical for every
-                # chunk, so cache it: the first chunk writes it, the rest read
-                # it back at a tenth of the input price.
-                system=[
-                    {
-                        "type": "text",
-                        "text": system,
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ],
-                output_config={
-                    "effort": "low",
-                    "format": {"type": "json_schema", "schema": _SCHEMA},
-                },
-                messages=[
-                    {
-                        "role": "user",
-                        "content": "Evaluate these LinkedIn posts:\n"
-                        + json.dumps(payload, ensure_ascii=False),
-                    }
-                ],
-            )
-        except anthropic.RateLimitError:
-            warnings.append("Claude API rate limit hit — some posts are unscored.")
-            break
-        except anthropic.APIStatusError as exc:
-            warnings.append(f"Claude API error {exc.status_code} — some posts are unscored.")
-            break
-        except anthropic.APIConnectionError:
-            warnings.append("Could not reach the Claude API — some posts are unscored.")
-            break
-
-        if usage is not None:
-            usage.record("draft", model, response)
-
-        if response.stop_reason == "refusal":
-            warnings.append("Claude declined to process one batch of posts — those are unscored.")
-            continue
-        if response.stop_reason == "max_tokens":
-            warnings.append("One AI batch was cut short — some posts in it may be unscored.")
-
-        text = next((b.text for b in response.content if b.type == "text"), "")
-        try:
-            evaluations = json.loads(text).get("evaluations", [])
-        except (json.JSONDecodeError, AttributeError):
-            warnings.append("Could not parse one AI batch — those posts are unscored.")
-            continue
-
-        for ev in evaluations:
+        for ev in (parsed or {}).get("evaluations", []):
             idx = ev.get("id")
-            if not isinstance(idx, int) or not (0 <= idx < len(targets)):
+            if isinstance(idx, int) and 0 <= idx < len(targets):
+                targets[idx]["relevance"] = max(0, min(10, int(ev.get("relevance", 0))))
+                targets[idx]["reason"] = str(ev.get("reason", "")).strip()
+
+    # ── Pass 2: draft only for posts that cleared the bar ─────────────
+    worth_it = [p for p in targets if isinstance(p.get("relevance"), int) and p["relevance"] >= min_rel]
+    print(f"Scored {len(targets)} posts; {len(worth_it)} cleared relevance {min_rel} and get drafts.")
+    if not worth_it:
+        return posts, warnings
+
+    draft_system = _DRAFT_SYSTEM.format(profile=profile, voice=voice)
+    for start in range(0, len(worth_it), DRAFT_CHUNK):
+        chunk = worth_it[start : start + DRAFT_CHUNK]
+        parsed = _call(
+            client, anthropic, draft_model, draft_system, _DRAFT_SCHEMA,
+            "Draft comments for these LinkedIn posts:\n" + _payload(chunk, start),
+            "low", usage, "draft", warnings,
+        )
+        for row in (parsed or {}).get("drafts", []):
+            idx = row.get("id")
+            if not isinstance(idx, int) or not (0 <= idx - start < len(chunk)):
                 continue
-            post = targets[idx]
-            post["relevance"] = max(0, min(10, int(ev.get("relevance", 0))))
-            post["reason"] = str(ev.get("reason", "")).strip()
-            post["comments"] = [
+            chunk[idx - start]["comments"] = [
                 {"style": c.get("style", "insight"), "text": str(c.get("text", "")).strip()}
-                for c in (ev.get("comments") or [])
+                for c in (row.get("comments") or [])
                 if str(c.get("text", "")).strip()
             ][:3]
 
