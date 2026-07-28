@@ -104,7 +104,11 @@ def search_posts(cfg: dict) -> tuple[list[dict], list[str]]:
     import anthropic
 
     client = anthropic.Anthropic()
-    model = cfg.get("model") or "claude-opus-5"
+    # Finding posts is mechanical next to judging them: run the searches and
+    # list what came back. That runs on a cheaper model than the scoring and
+    # comment drafting, which stay on `model`. Note this cannot be Haiku —
+    # web_search_20260209 needs Opus 4.6+ / Sonnet 4.6+.
+    model = cfg.get("search_model") or "claude-sonnet-5"
     search_cfg = cfg.get("search") or {}
     days = int(search_cfg.get("notable_days", 90))
     n_searches = max(1, min(5, int(search_cfg.get("searches_per_keyword", 2))))
@@ -152,6 +156,18 @@ def search_posts(cfg: dict) -> tuple[list[dict], list[str]]:
                     max_tokens=8000,
                     tools=tools,
                     messages=messages,
+                    # A pause_turn resume re-sends this whole conversation —
+                    # every search result harvested so far — and without a
+                    # breakpoint every resume re-bills all of it at full price.
+                    # Caching makes each resume read the prior turns back at a
+                    # tenth of that. This is the single largest saving here.
+                    cache_control={"type": "ephemeral"},
+                    # Left at the default this runs at "high" effort with
+                    # thinking on, which is far more deliberation than "run two
+                    # searches and list the URLs" needs. Not "low": the prompt
+                    # asks for a set number of distinct searches, and low effort
+                    # scopes work tightly enough to risk running fewer.
+                    output_config={"effort": "medium"},
                 )
                 # Harvest the authoritative URLs from the tool's own results.
                 for block in response.content:

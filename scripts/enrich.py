@@ -116,7 +116,16 @@ def enrich_posts(posts: list[dict], cfg: dict) -> tuple[list[dict], list[str]]:
             response = client.messages.create(
                 model=model,
                 max_tokens=8000,
-                system=system,
+                # The system prompt (profile + voice) is identical for every
+                # chunk, so cache it: the first chunk writes it, the rest read
+                # it back at a tenth of the input price.
+                system=[
+                    {
+                        "type": "text",
+                        "text": system,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
                 output_config={
                     "effort": "low",
                     "format": {"type": "json_schema", "schema": _SCHEMA},

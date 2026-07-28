@@ -125,7 +125,10 @@ search:
   # Web searches run per keyword, each with a different phrasing.
   # A single search returns a limited number of results (~10) and that count
   # is NOT adjustable — so if you want MORE posts found, raise this number.
-  # Each search costs about 1 cent. 11 keywords x 2 = ~22c per run.
+  #
+  # COST: this is the expensive dial. Beyond the ~1c per search itself, every
+  # result the search returns is billed as input, and a long search turn gets
+  # re-sent when it resumes. Raising this raises the bill faster than linearly.
   searches_per_keyword: 2
 
 # Posts scoring below this (0-10) are tucked into a collapsed section.
@@ -134,5 +137,11 @@ min_relevance: 5
 # Cost control: at most this many posts get AI scoring + drafts per run.
 max_enriched: 30
 
-# Claude model used for scoring and comment drafting.
+# Claude model used for scoring posts and drafting the comments — the part
+# whose quality you actually read. Leave this on Opus.
 model: claude-opus-5
+
+# Model used only for the web-search step (running the searches and listing
+# what came back). Cheaper, because that step is mechanical. This cannot be
+# Haiku: the search tool this app uses requires Sonnet 4.6+ / Opus 4.6+.
+search_model: claude-sonnet-5
