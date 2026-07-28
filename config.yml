@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────────────
-#  LinkedIn Comment Radar — configuration
+#  Bloctopus Intelligence — LinkedIn Comment Radar
 #
 #  HOW TO EDIT (no tools needed):
 #  1. Open this file on GitHub and click the pencil icon (top right).
@@ -8,26 +8,106 @@
 #  The dashboard rebuilds itself automatically within a couple of minutes.
 # ──────────────────────────────────────────────────────────────────────
 
-# What to search for. One entry per line, in quotes.
-# These are ordinary search queries — plain language works best.
+# Topics to watch. Each one becomes a live LinkedIn search link (free) plus
+# an AI-scored search of indexed posts (~1c per search).
+# Chosen for where your BUYERS and REFERRERS talk — lawyers, compliance
+# officers, CISOs and public sector — not where victims post.
 keywords:
-  - "fintech regulation"          # ← EXAMPLES — replace with your real topics
-  - "digital banking Slovenia"
-  - "MiCA crypto licensing"
+  # ── Referral channel: lawyers, litigation, disputes ──
+  - "crypto asset tracing litigation"
+  - "hidden crypto assets divorce"
 
-# Who is commenting, and why. Claude uses this to judge which posts are
-# worth your time and to draft comments that sound like you.
+  # ── Compliance buyers: exchanges, banks, VASPs ──
+  - "crypto source of funds verification"
+  - "MiCA compliance crypto"
+  - "AML crypto exchange compliance"
+
+  # ── Ransomware / incident response buyers: CISOs, DPOs ──
+  - "ransomware incident response Europe"
+  - "NIS2 incident reporting obligations"
+  - "DORA operational resilience finance"
+
+  # ── Core practice + public sector ──
+  - "blockchain forensics investigation"
+  - "crypto fraud investigation law enforcement"
+
+  # ── Home market (Slovenian-language posts) ──
+  - "kriptovalute prevara"
+
+# Who is commenting, and why. Claude uses this to judge which posts deserve
+# your time and to draft comments that sound like Bloctopus.
 profile: |
-  EXAMPLE — replace with your own description.
-  We are two consultants who help fintech companies navigate EU regulation.
-  We comment on LinkedIn to build visibility with founders, compliance
-  officers and investors. Knowledgeable but approachable — never salesy.
+  We are Bloctopus Intelligence (bloctopus.net), a blockchain forensics and
+  financial intelligence firm headquartered in Ljubljana, Slovenia, working
+  globally. Tagline: "Financial intelligence for the crypto era."
+
+  What we do:
+  - Trace stolen, frozen or disputed crypto assets across BTC, ETH, Tron,
+    BNB Chain, Polygon and Solana, including bridges, swaps and mixers.
+  - Investigate crypto scams, internal fraud, ransomware and extortion.
+  - Produce court-ready forensic reports usable by police, prosecutors,
+    lawyers and exchanges — we emphasise usable evidence, not raw data.
+  - Crypto Source-of-Funds verification for exchanges, banks and tax
+    authorities.
+  - Asset tracing in divorce, inheritance and other litigation.
+  - Rans|ilience: ransomware crisis response combining forensics, legal and
+    regulatory coordination and crisis communications.
+  - Incident reporting aligned with NIS2 and DORA; MiCA supervision
+    analytics and AML/FIU support; training for law enforcement and CERTs.
+
+  Commercials: forensics at EUR 200/hour with a cap agreed in advance;
+  recovery on a 15-25% success fee, no recovery no charge. Free initial
+  consultation. We decline cases where the forensic assessment shows no
+  realistic path to resolution.
+
+  Hard limits we never blur: we do not "hack" wallets, we never ask for seed
+  phrases or private keys, and we never guarantee recovery. Outcomes depend
+  on facts, timing, exchange cooperation and legal procedure.
+
+  WHO WE WANT TO REACH by commenting — in priority order:
+  1. Lawyers and law firms (crypto, disputes, insolvency, family law). Our
+     strongest proven referral channel: UK and Turkish firms have brought us
+     clients.
+  2. Compliance, AML and risk officers at exchanges, VASPs, banks and
+     fintechs — the source-of-funds and MiCA buyers.
+  3. CISOs, IT directors, DPOs and insurers at organisations in scope for
+     NIS2 and DORA — the ransomware buyers.
+  4. Public sector: law enforcement, financial intelligence units,
+     regulators, tax authorities.
+  5. The Slovenian and wider EU startup, fintech and legal community.
+
+  We are NOT trying to reach retail scam victims through LinkedIn comments.
+  Score posts LOW when the poster is a distressed individual describing
+  their own loss: commenting there reads as ambulance-chasing and puts us in
+  the same visual bucket as the recovery scammers we define ourselves
+  against. Also score low: posts by "crypto recovery" outfits, token shills,
+  price speculation, and generic motivational business content.
 
 # Tone guidance for the drafted comments.
 voice: |
-  Professional but warm. Short paragraphs. No hashtags, no emoji.
-  Always add a concrete insight, example or question — never generic
-  praise like "Great post!". Write in the same language as the post.
+  Sober, precise and evidence-based — the opposite of the hype in this
+  space. We sound like forensic practitioners, not marketers.
+
+  Do:
+  - Add one concrete, specific thing: a mechanism, a number, a timeline, a
+    procedural detail, a distinction others are glossing over. Draw on real
+    practice — choke-point analysis at centralised exchanges, the difference
+    between tracing and recovery, why speed matters before funds are layered.
+  - Be genuinely useful to the poster and to anyone reading over their
+    shoulder. A good comment is worth reading even by someone who never
+    contacts us.
+  - Ask a sharp question when we have one. Disagree when we have grounds.
+  - Write in the SAME LANGUAGE as the post (Slovenian post -> Slovenian).
+  - Keep it short: 1-3 sentences, plain paragraphs.
+
+  Never:
+  - Never promise, guarantee or imply that funds can be recovered.
+  - Never pitch our services, drop a price, or say "DM us" / "we can help
+    with this". Credibility is the goal; the enquiry follows on its own.
+  - Never ask anyone to share wallet details, seed phrases or private keys,
+    and never suggest anyone share them anywhere.
+  - No hashtags, no emoji, no "Great post!", no restating the post back.
+  - Never claim a specific case outcome we cannot stand behind publicly.
 
 search:
   # ── Top of dashboard: live LinkedIn search links ────────────────────
@@ -45,10 +125,10 @@ search:
   # Web searches run per keyword, each with a different phrasing.
   # A single search returns a limited number of results (~10) and that count
   # is NOT adjustable — so if you want MORE posts found, raise this number.
-  # Each search costs about 1 cent. 3 keywords x 3 searches = ~9c per run.
-  searches_per_keyword: 3
+  # Each search costs about 1 cent. 11 keywords x 2 = ~22c per run.
+  searches_per_keyword: 2
 
-# Posts scoring below this (0–10) are tucked into a collapsed section.
+# Posts scoring below this (0-10) are tucked into a collapsed section.
 min_relevance: 5
 
 # Cost control: at most this many posts get AI scoring + drafts per run.
