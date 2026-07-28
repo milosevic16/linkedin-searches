@@ -26,21 +26,19 @@ on:
       # commit would trigger another run, which would commit again, forever.
       - "data/**"
 
-permissions:
-  contents: write   # needed to commit data/latest.json back
-  pages: write
-  id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  # Building is separate from publishing so this workflow can run on a branch.
+  # The github-pages environment only permits deployments from the default
+  # branch, and that check happens before any step runs — so a job that both
+  # builds and deploys cannot be tested anywhere but main.
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: write   # needed to commit data/latest.json back
     steps:
       - uses: actions/checkout@v4
 
@@ -87,29 +85,38 @@ jobs:
           git commit -m "Store dashboard data for $(date -u +%Y-%m-%d)"
           git push
 
-      # Publishing happens only from main. Running this workflow on a branch
-      # builds and reports its cost without replacing the live dashboard.
-      - name: Upload site as an artifact (branch runs)
+      # On main this artifact is what the deploy job publishes. On a branch it
+      # is just a downloadable copy of the page, so a full run can be tested
+      # without touching the live dashboard.
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Upload readable copy (branch runs)
         if: github.ref != 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: dashboard-preview
           path: site
 
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       # Pages must already be enabled: Settings -> Pages -> Source: GitHub Actions.
       # A workflow token cannot create the Pages site itself ("Resource not
       # accessible by integration"), so this step reads the existing config only.
       - name: Configure GitHub Pages
-        if: github.ref == 'refs/heads/main'
         uses: actions/configure-pages@v5
-
-      - name: Upload site
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
 
       - name: Deploy to GitHub Pages
         id: deployment
-        if: github.ref == 'refs/heads/main'
         uses: actions/deploy-pages@v4
