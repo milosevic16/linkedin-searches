@@ -39,10 +39,11 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python scripts/build.py
 
+      # Pages must already be enabled: Settings -> Pages -> Source: GitHub Actions.
+      # A workflow token cannot create the Pages site itself ("Resource not
+      # accessible by integration"), so this step reads the existing config only.
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
