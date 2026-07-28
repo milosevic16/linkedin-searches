@@ -93,6 +93,15 @@ scripts/render.py                 static HTML dashboard + data.json (remembers
 - **No hallucinated links:** URLs come from the search tool's own result blocks,
   not from Claude's prose. Anything the model mentions that the search did not
   actually return is discarded before it can reach the dashboard.
+- **How many posts you get:** one web search returns roughly 10 results and that
+  count is not adjustable — the API bills per *search*, not per result. So the
+  only lever on volume is `searches_per_keyword` in `config.yml` (each phrased
+  differently to widen the net). Expect on the order of 10–25 usable posts per
+  run from 3 keywords × 3 searches, after duplicates and non-post URLs are
+  dropped. Raise the number, or add keywords, if you want more.
+- **Dynamic filtering is deliberately off** (`allowed_callers: ["direct"]`). By
+  default this tool version filters results inside code execution before Claude
+  sees them, which would silently drop candidate posts.
 - **Freshness / dedupe:** searches target the last `days_back` days; the previous
   deploy's `data.json` is fetched so already-shown posts lose their NEW badge.
 - **Coverage caveat:** search engines index many but not all public LinkedIn

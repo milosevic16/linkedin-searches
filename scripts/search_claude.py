@@ -19,8 +19,14 @@ WEB_SEARCH_TOOL = "web_search_20260209"
 
 _PROMPT = """Search LinkedIn for recent public posts about: {keyword}
 
-Run {n_searches} web search{plural} to find posts published in the last {days} days. \
-Good queries look like: site:linkedin.com/posts {keyword}
+Run {n_searches} web search{plural} to find posts published in the last {days} days.
+
+Each search returns a limited number of results, so make your queries DIFFERENT \
+from one another to widen the net rather than repeating one phrasing. Vary them by:
+- the wording people actually use for this topic (synonyms, the acronym vs the full term)
+- the angle (news/announcement, opinion/debate, practical how-it-affects-us)
+- adding a recency word such as the current month or year
+A good query looks like: site:linkedin.com/posts {keyword}
 
 Then reply with ONLY a JSON array (no prose before or after) describing the \
 LinkedIn posts you found. One object per post:
@@ -114,6 +120,12 @@ def search_posts(cfg: dict) -> tuple[list[dict], list[str]]:
                 "name": "web_search",
                 "max_uses": n_searches + 2,  # headroom for query refinement
                 "allowed_domains": ["linkedin.com"],
+                # Bypass "dynamic filtering". By default this tool version runs
+                # search inside code execution, which prunes results before they
+                # reach the model — good for research questions, wrong for us:
+                # we want every raw result so no candidate post is silently
+                # dropped, and direct calls keep the result blocks top-level.
+                "allowed_callers": ["direct"],
             }
         ]
 

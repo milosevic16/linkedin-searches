@@ -31,8 +31,13 @@ voice: |
 
 search:
   days_back: 3               # aim for posts from the last N days
-  searches_per_keyword: 2    # web searches per keyword (cost: ~$0.01 each)
   include_articles: true     # also match linkedin.com/pulse articles
+
+  # Web searches run per keyword, each with a different phrasing.
+  # A single search returns a limited number of results (~10) and that count
+  # is NOT adjustable — so if you want MORE posts found, raise this number.
+  # Each search costs about 1 cent. 3 keywords x 3 searches = ~9c per run.
+  searches_per_keyword: 3
 
 # Posts scoring below this (0–10) are tucked into a collapsed section.
 min_relevance: 5
