@@ -48,7 +48,21 @@ pages, company pages, job listings on /jobs/, and search result pages.
 - If you found nothing suitable, reply with exactly: []
 """
 
-_URL_RE = re.compile(r"https?://[^\s\"'<>)]+", re.I)
+_SEARCH_TITLE_RE = re.compile(r"^(.{2,80}?)\s+on LinkedIn:?\s*(.*)$", re.S)
+_POSTED_BY_RE = re.compile(r"^(.*?)\s*\|\s*(.{2,80}?)\s+posted on the topic", re.S | re.I)
+
+
+def _split_search_title(title: str) -> tuple[str, str]:
+    """Search-result titles carry the author. Two observed shapes:
+    "<Author> on LinkedIn: <text>" and "<text> | <Author> posted on the topic".
+    """
+    m = _SEARCH_TITLE_RE.match(title or "")
+    if m:
+        return m.group(1).strip(), (m.group(2) or "").strip()
+    m = _POSTED_BY_RE.match(title or "")
+    if m:
+        return m.group(2).strip(), m.group(1).strip()
+    return "", (title or "").strip()
 
 
 def _normalize(url: str) -> str:
@@ -191,14 +205,22 @@ def search_posts(cfg: dict) -> tuple[list[dict], list[str]]:
             if url in found_urls:  # ← the guard: must be a real search result
                 described[url] = item
 
-        for url, meta in found_urls.items():
-            desc = described.get(url, {})
+        # Only posts Claude vouched for. It has read the results and applied the
+        # recency/quality rules; the raw result set is full of years-old posts,
+        # so iterating found_urls here would flood the dashboard with them.
+        # found_urls remains the whitelist — an invented URL still can't get in.
+        for url, desc in described.items():
+            meta = found_urls[url]
+            title = (desc.get("title") or meta["title"] or "").strip()
+            author = (desc.get("author") or "").strip()
+            if not author:  # search titles look like "<Author> on LinkedIn: <text>"
+                author, title = _split_search_title(title)
             post = posts.setdefault(
                 url,
                 {
                     "url": url,
-                    "title": (desc.get("title") or meta["title"] or "").strip(),
-                    "author": (desc.get("author") or "").strip(),
+                    "title": title,
+                    "author": author,
                     "snippet": (desc.get("snippet") or "").strip(),
                     "keywords": [],
                     "is_article": "/pulse/" in url,
