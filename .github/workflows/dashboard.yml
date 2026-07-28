@@ -87,17 +87,29 @@ jobs:
           git commit -m "Store dashboard data for $(date -u +%Y-%m-%d)"
           git push
 
+      # Publishing happens only from main. Running this workflow on a branch
+      # builds and reports its cost without replacing the live dashboard.
+      - name: Upload site as an artifact (branch runs)
+        if: github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-preview
+          path: site
+
       # Pages must already be enabled: Settings -> Pages -> Source: GitHub Actions.
       # A workflow token cannot create the Pages site itself ("Resource not
       # accessible by integration"), so this step reads the existing config only.
       - name: Configure GitHub Pages
+        if: github.ref == 'refs/heads/main'
         uses: actions/configure-pages@v5
 
       - name: Upload site
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
       - name: Deploy to GitHub Pages
         id: deployment
+        if: github.ref == 'refs/heads/main'
         uses: actions/deploy-pages@v4
