@@ -1,13 +1,13 @@
 """Render the dashboard: site/index.html + site/data.json.
 
-The page is organised by TOPIC. Each topic gets one section containing:
-  - a deep link into LinkedIn's own search, for posts published today
-  - the posts we actually found for that topic, each with three comment
-    drafts written for that specific post
+The page is organised by TOPIC. Each topic gets a deep link into LinkedIn's
+own search plus reusable comment angles to bring to whatever it turns up.
 
-The general per-topic "angles" are kept, but subordinated: they only exist
-because we cannot read the posts behind the live search link (LinkedIn
-blocks crawlers), so for those there is nothing to tailor a draft to.
+When search.find_posts is on, individual posts found for a topic appear
+underneath it, each with three drafts written for that specific post. It is
+off by default: web search sees LinkedIn months late, so what it finds is
+never fresh enough to be worth commenting on. The angles are general because
+we cannot read the posts behind the live link — LinkedIn blocks crawlers.
 
 site/data.json carries the URLs already shown, fetched back from the live
 Pages deploy on the next run so repeats aren't re-flagged as new.
@@ -145,7 +145,7 @@ def _group_by_topic(posts: list[dict], topics: list[dict]) -> dict[str, list[dic
     return grouped
 
 
-def _topic_section(topic: dict, posts: list[dict], min_rel: int) -> str:
+def _topic_section(topic: dict, posts: list[dict], min_rel: int, searching: bool = True) -> str:
     angles = [(a.get("label") or "Angle", a.get("text")) for a in topic.get("angles") or []]
     angles_html = _drafts_block(
         angles,
@@ -164,9 +164,11 @@ def _topic_section(topic: dict, posts: list[dict], min_rel: int) -> str:
 
     if top:
         cards = "".join(_card(p) for p in top)
+    elif searching:
+        cards = """<p class="empty-topic">Nothing recent enough found for this topic.
+        Use the link above — it queries LinkedIn directly and is always current.</p>"""
     else:
-        cards = """<p class="empty-topic">Nothing indexed for this topic this run.
-        The live search link above still works — it queries LinkedIn directly.</p>"""
+        cards = ""  # search is off by design; the links and angles are the section
 
     rest_html = ""
     if rest:
@@ -174,11 +176,14 @@ def _topic_section(topic: dict, posts: list[dict], min_rel: int) -> str:
           <summary>Lower relevance ({len(rest)})</summary>{"".join(_card(p) for p in rest)}</details>"""
 
     n_new = sum(1 for p in posts if p.get("is_new"))
-    count_bits = [f"{len(posts)} post{'s' if len(posts) != 1 else ''} found"]
-    if drafted:
-        count_bits.append(f"{len(drafted)} with drafts")
-    if n_new:
-        count_bits.append(f"{n_new} new")
+    if not searching and not posts:
+        count_bits = ["Opens LinkedIn's own search — always current"]
+    else:
+        count_bits = [f"{len(posts)} post{'s' if len(posts) != 1 else ''} found"]
+        if drafted:
+            count_bits.append(f"{len(drafted)} with drafts")
+        if n_new:
+            count_bits.append(f"{n_new} new")
 
     return f"""<section class="topic-block" id="t-{_slug(topic['keyword'])}" data-new="{1 if n_new else 0}">
       <div class="topic-head">
@@ -221,6 +226,7 @@ def render(
     gathered_at: str | None = None,
     mark_new: bool = True,
 ) -> None:
+    searching = bool((cfg.get("search") or {}).get("find_posts", False))
     site = Path(__file__).resolve().parent.parent / "site"
     site.mkdir(exist_ok=True)
     topics = topics or []
@@ -271,7 +277,7 @@ def render(
         body_main = _setup_section()
     else:
         grouped = _group_by_topic(posts, topics)
-        blocks = [_topic_section(t, grouped.get(t["keyword"], []), min_rel) for t in topics]
+        blocks = [_topic_section(t, grouped.get(t["keyword"], []), min_rel, searching) for t in topics]
         leftovers = grouped.get("Other matches") or []
         if leftovers:
             blocks.append(
@@ -293,12 +299,19 @@ def render(
         </div>
         {"".join(blocks)}"""
 
-    stats = f"""<div class="stats">
-      <div class="stat"><span class="stat-n">{len(topics)}</span><span class="stat-l">topics</span></div>
-      <div class="stat"><span class="stat-n">{len(posts)}</span><span class="stat-l">posts found</span></div>
-      <div class="stat"><span class="stat-n">{n_drafted}</span><span class="stat-l">with drafts</span></div>
-      <div class="stat"><span class="stat-n">{n_new}</span><span class="stat-l">new since last run</span></div>
-    </div>"""
+    if searching or posts:
+        stats = f"""<div class="stats">
+          <div class="stat"><span class="stat-n">{len(topics)}</span><span class="stat-l">topics</span></div>
+          <div class="stat"><span class="stat-n">{len(posts)}</span><span class="stat-l">posts found</span></div>
+          <div class="stat"><span class="stat-n">{n_drafted}</span><span class="stat-l">with drafts</span></div>
+          <div class="stat"><span class="stat-n">{n_new}</span><span class="stat-l">new since last run</span></div>
+        </div>"""
+    else:
+        n_angles = sum(len(t.get("angles") or []) for t in topics)
+        stats = f"""<div class="stats">
+          <div class="stat"><span class="stat-n">{len(topics)}</span><span class="stat-l">topics to work</span></div>
+          <div class="stat"><span class="stat-n">{n_angles}</span><span class="stat-l">comment angles</span></div>
+        </div>"""
 
     # The page is static HTML on GitHub Pages, so this cannot POST to the
     # Actions API directly — that needs a token, and a token embedded in a

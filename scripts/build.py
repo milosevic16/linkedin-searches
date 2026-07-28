@@ -114,13 +114,20 @@ def main() -> int:
         warnings += w
         print(f"Prepared {len(topics)} live search links.")
 
-        # 2. Notable half: what web search can actually see (weeks/months old).
-        posts, w = search_posts(cfg, usage=usage)
-        warnings += w
-        print(f"Found {len(posts)} notable posts.")
+        # 2. Searching for individual posts is optional, and off by default:
+        #    web search sees LinkedIn months late, so it cannot supply posts
+        #    recent enough to be worth commenting on. See find_posts in
+        #    config.yml.
+        if (cfg.get("search") or {}).get("find_posts", False):
+            posts, w = search_posts(cfg, usage=usage)
+            warnings += w
+            print(f"Found {len(posts)} posts within the age limit.")
 
-        posts, w = enrich_posts(posts, cfg, usage=usage)
-        warnings += w
+            posts, w = enrich_posts(posts, cfg, usage=usage)
+            warnings += w
+        else:
+            posts = []
+            print("Post search is off (search.find_posts) — links and angles only.")
         gathered_at = now
 
     elif mode == store.REDRAFT:
@@ -145,6 +152,13 @@ def main() -> int:
             topics, w = build_launcher(cfg, with_angles=False)
             warnings += w
         print(f"Rendering {len(posts)} stored posts — no API calls.")
+
+    # With post search off, previously-gathered posts must not keep rendering:
+    # they are exactly the stale material that turning it off was meant to stop
+    # showing. This applies in every mode, including a plain re-render.
+    if not (cfg.get("search") or {}).get("find_posts", False) and posts:
+        print(f"Post search is off — hiding {len(posts)} previously gathered posts.")
+        posts = []
 
     # Render first so the is_new flags it sets get persisted, but save in a
     # finally: a rendering bug must not throw away searches we already paid

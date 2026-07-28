@@ -37,6 +37,8 @@ def fingerprint(cfg: dict) -> dict:
     return {
         "search": _digest(
             cfg.get("keywords"),
+            search_cfg.get("find_posts"),
+            search_cfg.get("notable_max_age_hours"),
             search_cfg.get("notable_days"),
             search_cfg.get("include_articles"),
             search_cfg.get("searches_per_keyword"),
@@ -46,6 +48,7 @@ def fingerprint(cfg: dict) -> dict:
             cfg.get("profile"),
             cfg.get("voice"),
             cfg.get("model"),
+            cfg.get("angles_model"),
             cfg.get("max_enriched"),
         ),
     }

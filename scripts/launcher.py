@@ -119,10 +119,12 @@ def build_launcher(cfg: dict, usage=None, with_angles: bool = True) -> tuple[lis
     import anthropic
 
     client = anthropic.Anthropic()
-    # Deliberately left on the main model: this is one call per run and its
-    # output is text the user pastes into LinkedIn, so it is not worth
-    # degrading to save a few cents.
-    angles_model = cfg.get("model") or "claude-opus-5"
+    # Writing three reusable talking points per topic is not a hard task, and
+    # with post search off this is the only model call a refresh makes — so it
+    # runs on the cheapest model rather than the best one. If the angles start
+    # reading as generic, raise angles_model in config.yml; the whole call is
+    # a few cents at any tier.
+    angles_model = cfg.get("angles_model") or "claude-haiku-4-5"
     try:
         response = client.messages.create(
             model=angles_model,

@@ -4,23 +4,24 @@ A dashboard that puts **LinkedIn posts worth commenting on** in front of you,
 with Claude-written comment ideas ready to adapt — so building visibility takes
 minutes instead of an hour of scrolling.
 
-**It refreshes when you ask it to, not on a schedule.** Searching costs real API
-credit (about EUR 1.20 a time), so there is a **Refresh posts** button at the top
-of the dashboard and nothing runs until you press it. The live LinkedIn search
-links on the page are fresh every time you open them regardless — those are free.
+**It refreshes when you ask it to, not on a schedule.** There is a **Refresh**
+button at the top of the dashboard and nothing runs until you press it. A refresh
+costs a couple of cents.
 
 The page is organised **by topic**. Each topic gets one section containing both
 of the things you need, because no single source does both jobs:
 
-| In each topic section | What it is | Why |
-|---|---|---|
-| **A link into LinkedIn's own search** | Pre-filtered to the last 24 hours, sorted newest-first, plus 3 reusable comment angles | LinkedIn blocks crawlers, so **its own search is the only place today's posts exist**. Because we can't read those posts, the angles are general — there's nothing specific to tailor them to. |
-| **The posts we actually found** | Indexed posts from roughly the last 90 days, each with a relevance score and **three comment drafts written for that specific post** | Search engines index only a thin, delayed slice of LinkedIn. Good for finding people and threads worth knowing — *not* today's commenting queue. |
+Each topic gives you a **link into LinkedIn's own search**, pre-filtered to the
+last 24 hours and sorted newest-first, plus **3 reusable comment angles** to bring
+to whatever you find there.
 
-**Why both:** we measured it. Live web searches restricted to `linkedin.com`
-returned results whose newest entries were ~2 months old, with the bulk from
-2021–2023. Nothing from the past week. So the link hands you into LinkedIn
-directly for freshness, and the found posts use AI where it genuinely helps.
+**Why it works this way.** LinkedIn blocks crawlers, so its own search is the only
+place recent posts exist. We measured the alternative: web search restricted to
+`linkedin.com` returned nothing newer than **112 days old**, most of it far older.
+Since LinkedIn engagement is over within about 48 hours, commenting on those earns
+nothing — so the tool no longer pays to find them (see `find_posts` in
+`config.yml`). Because we can't read the posts behind the live link, the angles
+are general rather than per-post; that's the honest trade.
 
 Timing matters: LinkedIn engagement decays within roughly 48 hours, so a comment
 on a months-old post earns very little. Work the live search links daily; treat
@@ -34,13 +35,10 @@ LinkedIn logged in as yourself.
 ## For the two of you (daily use)
 
 1. **Bookmark the dashboard:** `https://milosevic16.github.io/linkedin-searches/`
-2. **Work one topic at a time.** Click **Past 24 hours ↗** to open LinkedIn's own
-   search for that topic, newest first, and comment on what's worth it. Expand
-   *"general angles"* first if you want talking points to hand.
-3. **Then work the posts listed underneath.** Each one has its own three drafts,
-   written for that post — expand *"comments written for this post"* and copy.
-   **NEW** marks anything not shown on a previous run.
-4. **Always adapt a draft before posting** — two accounts pasting identical
+2. **Work one topic at a time.** Expand *"general angles"* for talking points,
+   then click **Past 24 hours ↗** to open LinkedIn's own search for that topic,
+   newest first, and comment on what's worth it.
+3. **Always adapt an angle before posting** — two accounts pasting identical
    comments is the fastest way to look like bots.
 5. Want it refreshed right now? Actions tab → **Build dashboard** → *Run
    workflow* → pick **gather** (needs a GitHub account with access to this repo).
@@ -59,9 +57,9 @@ so a rebuild only redoes the stage whose inputs actually changed:
 
 | You edit | What re-runs | Cost |
 |---|---|---|
-| `min_relevance`, wording, layout | the page only | **free** |
-| `voice`, `profile` | re-scores and re-drafts the stored posts | no searching |
-| `keywords`, `notable_days`, `searches_per_keyword` | a full search | full run |
+| wording, layout, thresholds | the page only | **free** |
+| `voice`, `profile` | rewrites the comment angles | a couple of cents |
+| `keywords` | new angles for the new topics | a couple of cents |
 
 So you can iterate on comment tone as often as you like without paying to search
 LinkedIn again each time. Only pressing **Refresh posts** starts a search.

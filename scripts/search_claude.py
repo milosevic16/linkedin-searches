@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import datetime, timezone
 
 # The tool version that supports dynamic filtering (Opus 5 / Sonnet 5 / 4.6+).
 WEB_SEARCH_TOOL = "web_search_20260209"
@@ -67,6 +68,40 @@ def _split_search_title(title: str) -> tuple[str, str]:
 
 def _normalize(url: str) -> str:
     return (url or "").split("?")[0].split("#")[0].rstrip("/")
+
+
+# LinkedIn activity IDs are snowflake-style: the top 41 bits are a millisecond
+# timestamp. That gives the post's real publication date straight from the URL,
+# which matters because the search tool's own `page_age` is absent on most
+# results — and because asking the model to "skip anything older than N days"
+# never worked: it has no way to know, so it didn't.
+_ACTIVITY_RE = re.compile(r"activity[-:](\d{18,20})")
+_SNOWFLAKE_SHIFT = 22
+
+_PAGE_AGE_FORMATS = ("%B %d, %Y", "%b %d, %Y", "%Y-%m-%d", "%d %B %Y")
+
+
+def _post_datetime(url: str, page_age: str | None) -> datetime | None:
+    """Best available publication time for a post, or None if undatable."""
+    m = _ACTIVITY_RE.search(url or "")
+    if m:
+        ms = int(m.group(1)) >> _SNOWFLAKE_SHIFT
+        # Sanity-bound it: a decoded value outside a plausible range means the
+        # ID was not a snowflake after all, and a wrong date is worse than none.
+        if 1_262_304_000_000 < ms < 4_102_444_800_000:  # 2010..2100
+            return datetime.fromtimestamp(ms / 1000, timezone.utc)
+    for fmt in _PAGE_AGE_FORMATS:
+        try:
+            return datetime.strptime((page_age or "").strip(), fmt).replace(tzinfo=timezone.utc)
+        except (ValueError, AttributeError):
+            continue
+    return None
+
+
+def _max_age_hours(search_cfg: dict) -> float:
+    if search_cfg.get("notable_max_age_hours") is not None:
+        return float(search_cfg["notable_max_age_hours"])
+    return float(search_cfg.get("notable_days", 90)) * 24
 
 
 def _is_post_url(url: str, include_articles: bool) -> bool:
@@ -134,8 +169,10 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
     days = int(search_cfg.get("notable_days", 90))
     n_searches = max(1, min(5, int(search_cfg.get("searches_per_keyword", 2))))
     include_articles = bool(search_cfg.get("include_articles", True))
+    max_age_hours = _max_age_hours(search_cfg)
 
     posts: dict[str, dict] = {}
+    too_old = undatable = 0
 
     for keyword in cfg.get("keywords") or []:
         keyword = str(keyword).strip()
@@ -261,6 +298,19 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
         # found_urls remains the whitelist — an invented URL still can't get in.
         for url, desc in described.items():
             meta = found_urls[url]
+
+            # Recency is enforced here, in code, against a date derived from
+            # the URL — not left to the model's judgement, which cannot see a
+            # publication date and so silently let years-old posts through.
+            when = _post_datetime(url, meta.get("page_age"))
+            if when is None:
+                undatable += 1
+                continue
+            age_hours = (datetime.now(timezone.utc) - when).total_seconds() / 3600
+            if age_hours > max_age_hours:
+                too_old += 1
+                continue
+
             title = (desc.get("title") or meta["title"] or "").strip()
             author = (desc.get("author") or "").strip()
             if not author:  # search titles look like "<Author> on LinkedIn: <text>"
@@ -275,9 +325,28 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
                     "keywords": [],
                     "is_article": "/pulse/" in url,
                     "page_age": meta.get("page_age"),
+                    "posted_at": when.isoformat(),
+                    "age_hours": round(age_hours, 1),
                 },
             )
             if keyword not in post["keywords"]:
                 post["keywords"].append(keyword)
+
+    # Say what the filter threw away. Silence here is how years-old posts sat
+    # on the dashboard unnoticed: the section simply looked full.
+    if too_old or undatable:
+        window = (
+            f"{max_age_hours / 24:.0f} days" if max_age_hours >= 48 else f"{max_age_hours:.0f} hours"
+        )
+        bits = []
+        if too_old:
+            bits.append(f"{too_old} older than {window}")
+        if undatable:
+            bits.append(f"{undatable} with no verifiable date")
+        warnings.append(
+            f"Discarded {' and '.join(bits)}. Web search indexes LinkedIn months late, so a "
+            f"short window will usually leave this empty — the live search links are the "
+            f"only source of genuinely recent posts."
+        )
 
     return list(posts.values()), warnings
