@@ -106,6 +106,46 @@ def _card(post: dict) -> str:
     </article>"""
 
 
+def _launcher_section(topics: list[dict]) -> str:
+    """Deep links into LinkedIn's own search — the only reliably fresh source."""
+    if not topics:
+        return ""
+    blocks = []
+    for t in topics:
+        angles = "".join(
+            f"""<div class="draft">
+              <div class="draft-head"><span class="draft-style">{_esc(a["label"])}</span>
+              <button class="copy" type="button">Copy</button></div>
+              <p class="draft-text">{_esc(a["text"])}</p>
+            </div>"""
+            for a in t.get("angles") or []
+        )
+        angles_html = (
+            f"""<details class="drafts"><summary>{len(t["angles"])} comment angles for this topic</summary>{angles}</details>"""
+            if t.get("angles")
+            else ""
+        )
+        blocks.append(
+            f"""<article class="card topic">
+              <div class="card-head">
+                <div class="card-id">
+                  <div class="author">{_esc(t["keyword"])}</div>
+                  <div class="title">Opens LinkedIn search · {_esc(t["window_label"])} · newest first</div>
+                </div>
+                <a class="open" href="{_esc(t["fresh_url"])}" target="_blank" rel="noopener">{_esc(t["window_label"])}&nbsp;↗</a>
+                <a class="open alt" href="{_esc(t["week_url"])}" target="_blank" rel="noopener">Past week&nbsp;↗</a>
+              </div>
+              {angles_html}
+            </article>"""
+        )
+    return f"""<section class="block">
+      <h2 class="block-h">Fresh posts — comment today</h2>
+      <p class="block-sub">These open LinkedIn's own search, which sees posts that search engines never index.
+      You must be logged in to LinkedIn. Comment while the post is young — engagement dies after about 48 hours.</p>
+      <div class="cards">{"".join(blocks)}</div>
+    </section>"""
+
+
 def _setup_section() -> str:
     return """<section class="notice setup">
       <h2>Almost there — one-time setup needed</h2>
@@ -120,7 +160,13 @@ def _setup_section() -> str:
     </section>"""
 
 
-def render(posts: list[dict], cfg: dict, warnings: list[str], configured: bool = True) -> None:
+def render(
+    posts: list[dict],
+    cfg: dict,
+    warnings: list[str],
+    configured: bool = True,
+    topics: list[dict] | None = None,
+) -> None:
     site = Path(__file__).resolve().parent.parent / "site"
     site.mkdir(exist_ok=True)
 
@@ -155,14 +201,17 @@ def render(posts: list[dict], cfg: dict, warnings: list[str], configured: bool =
         items = "".join(f"<li>{_esc(w)}</li>" for w in warnings)
         warn_html = f'<section class="notice warn"><ul>{items}</ul></section>'
 
+    launcher_html = _launcher_section(topics or [])
+
     if not configured:
         body_main = _setup_section()
     elif not posts:
-        days = (cfg.get("search") or {}).get("days_back", 3)
-        body_main = f"""<section class="notice empty">
-          <h2>No fresh posts today</h2>
-          <p>Nothing matching your keywords was indexed in the last {days} day(s).
-          Try broader keywords in <code>config.yml</code>, or simply check back tomorrow.</p>
+        days = (cfg.get("search") or {}).get("notable_days", 90)
+        body_main = launcher_html + f"""<section class="notice empty">
+          <h2>No notable posts surfaced this run</h2>
+          <p>Nothing matching your keywords turned up in the last {days} days of indexed posts.
+          The links above still work — they query LinkedIn directly. To widen this section,
+          add keywords or raise <code>notable_days</code> in <code>config.yml</code>.</p>
         </section>"""
     else:
         chip_buttons = "".join(
@@ -180,12 +229,21 @@ def render(posts: list[dict], cfg: dict, warnings: list[str], configured: bool =
               <summary>Lower relevance ({len(rest)})</summary>
               {"".join(_card(p) for p in rest)}
             </details>"""
-        body_main = filters + f'<section class="cards">{cards_top}</section>' + rest_html
+        notable_days = (cfg.get("search") or {}).get("notable_days", 90)
+        body_main = launcher_html + f"""<section class="block">
+          <h2 class="block-h">Notable in your niche</h2>
+          <p class="block-sub">Scored posts from roughly the last {notable_days} days. Search engines index only a
+          thin, delayed slice of LinkedIn, so treat these as people and threads worth knowing —
+          not as today's commenting queue.</p>
+          {filters}
+          <div class="cards">{cards_top}</div>
+          {rest_html}
+        </section>"""
 
     stats = f"""<div class="stats">
-      <div class="stat"><span class="stat-n">{len(posts)}</span><span class="stat-l">posts found</span></div>
-      <div class="stat"><span class="stat-n">{n_new}</span><span class="stat-l">new today</span></div>
-      <div class="stat"><span class="stat-n">{len(top) if any_scored else "–"}</span><span class="stat-l">worth a look</span></div>
+      <div class="stat"><span class="stat-n">{len(topics or [])}</span><span class="stat-l">live searches</span></div>
+      <div class="stat"><span class="stat-n">{len(posts)}</span><span class="stat-l">notable posts</span></div>
+      <div class="stat"><span class="stat-n">{n_new}</span><span class="stat-l">new since last run</span></div>
     </div>"""
 
     page = f"""<!doctype html>
@@ -246,6 +304,12 @@ header h1 {{ font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }}
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }}
 .open {{ flex: none; background: var(--accent); color: var(--accent-ink); text-decoration: none;
   border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }}
+.open.alt {{ background: transparent; color: var(--accent); border: 1px solid var(--accent); }}
+.block {{ margin-bottom: 30px; }}
+.block-h {{ font-size: 17px; margin: 0 0 4px; }}
+.block-sub {{ color: var(--ink-2); font-size: 13px; margin: 0 0 14px; }}
+.card.topic .author {{ font-size: 15px; }}
+.card.topic .card-head {{ align-items: center; flex-wrap: wrap; }}
 .snippet {{ margin: 10px 0 6px; color: var(--ink); font-size: 14px; }}
 .reason {{ margin: 0 0 8px; color: var(--ink-2); font-size: 13px; font-style: italic; }}
 .chips {{ display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }}
@@ -279,12 +343,12 @@ code {{ background: var(--low-bg); border-radius: 5px; padding: 1px 5px; font-si
 <div class="wrap">
   <header>
     <h1>LinkedIn Comment Radar</h1>
-    <p class="sub">Fresh posts worth commenting on · updated {_esc(generated)}</p>
+    <p class="sub">Your LinkedIn commenting shortlist · updated {_esc(generated)}</p>
   </header>
   {stats}
   {warn_html}
   {body_main}
-  <footer>Click a post's <strong>Open ↗</strong> to comment on LinkedIn (you must be logged in there).<br>
+  <footer>Adapt every draft before posting — identical comments from two accounts read as bots.<br>
   Topics and voice live in <a href="https://github.com/{_esc(os.environ.get("GITHUB_REPOSITORY", "milosevic16/linkedin-searches"))}/blob/main/config.yml">config.yml</a>.</footer>
 </div>
 <script>

@@ -30,7 +30,16 @@ voice: |
   praise like "Great post!". Write in the same language as the post.
 
 search:
-  days_back: 3               # aim for posts from the last N days
+  # ── Top of dashboard: live LinkedIn search links ────────────────────
+  # How recent the posts behind each link should be.
+  # Options: past-24h, past-week, past-month
+  fresh_window: past-24h
+
+  # ── Bottom of dashboard: AI-scored "notable" posts ──────────────────
+  # Search engines index only a thin, delayed slice of LinkedIn, so this
+  # section reaches back months rather than days. Anything under ~30 here
+  # will usually return nothing at all.
+  notable_days: 90
   include_articles: true     # also match linkedin.com/pulse articles
 
   # Web searches run per keyword, each with a different phrasing.

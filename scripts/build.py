@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import yaml
 
 from enrich import enrich_posts
+from launcher import build_launcher
 from render import render
 from search_claude import search_posts
 
@@ -33,22 +34,34 @@ def main() -> int:
 
     if "--sample" in sys.argv:
         posts = json.loads((ROOT / "scripts" / "sample_posts.json").read_text(encoding="utf-8"))
-        render(posts, cfg, warnings=["Sample data — this is an offline preview, not real search results."])
+        topics, _ = build_launcher(cfg)  # links need no API key
+        render(
+            posts,
+            cfg,
+            warnings=["Sample data — this is an offline preview. The LinkedIn links above are real."],
+            topics=topics,
+        )
         print(f"Sample dashboard written to {ROOT / 'site' / 'index.html'}")
         return 0
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("::warning::ANTHROPIC_API_KEY not set — rendering setup page.")
-        render([], cfg, warnings=[], configured=False)
+        render([], cfg, warnings=[], configured=False, topics=build_launcher(cfg)[0])
         return 0
 
-    posts, warnings = search_posts(cfg)
-    print(f"Found {len(posts)} candidate posts.")
+    # 1. Fresh half: deep links into LinkedIn's own search + reusable angles.
+    topics, warnings = build_launcher(cfg)
+    print(f"Prepared {len(topics)} live search links.")
+
+    # 2. Notable half: what web search can actually see (weeks/months old).
+    posts, search_warnings = search_posts(cfg)
+    warnings += search_warnings
+    print(f"Found {len(posts)} notable posts.")
 
     posts, enrich_warnings = enrich_posts(posts, cfg)
     warnings += enrich_warnings
 
-    render(posts, cfg, warnings=warnings, configured=True)
+    render(posts, cfg, warnings=warnings, configured=True, topics=topics)
     for w in warnings:
         print(f"::warning::{w}")
     print(f"Dashboard written to {ROOT / 'site' / 'index.html'}")

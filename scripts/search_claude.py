@@ -106,7 +106,7 @@ def search_posts(cfg: dict) -> tuple[list[dict], list[str]]:
     client = anthropic.Anthropic()
     model = cfg.get("model") or "claude-opus-5"
     search_cfg = cfg.get("search") or {}
-    days = int(search_cfg.get("days_back", 3))
+    days = int(search_cfg.get("notable_days", 90))
     n_searches = max(1, min(5, int(search_cfg.get("searches_per_keyword", 2))))
     include_articles = bool(search_cfg.get("include_articles", True))
 
