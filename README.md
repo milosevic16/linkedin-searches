@@ -4,21 +4,22 @@ A self-refreshing dashboard that puts **LinkedIn posts worth commenting on** in
 front of you every morning, with Claude-written comment ideas ready to adapt — so
 building visibility takes minutes instead of an hour of scrolling.
 
-The dashboard has **two sections**, because no single source does both jobs:
+The page is organised **by topic**. Each topic gets one section containing both
+of the things you need, because no single source does both jobs:
 
-| Section | What it is | Why |
+| In each topic section | What it is | Why |
 |---|---|---|
-| **Fresh posts — comment today** | One-click links into LinkedIn's *own* search per keyword, pre-filtered to the last 24 hours and sorted newest-first, plus 3 reusable comment angles per topic | LinkedIn blocks crawlers, so **its own search is the only place today's posts exist**. You land on genuinely fresh posts and comment while they're live. |
-| **Notable in your niche** | AI-scored posts from roughly the last 90 days, each with a relevance score and 2–3 ready comment drafts | Search engines index only a thin, delayed slice of LinkedIn. Good for finding people and threads worth knowing — *not* today's commenting queue. |
+| **A link into LinkedIn's own search** | Pre-filtered to the last 24 hours, sorted newest-first, plus 3 reusable comment angles | LinkedIn blocks crawlers, so **its own search is the only place today's posts exist**. Because we can't read those posts, the angles are general — there's nothing specific to tailor them to. |
+| **The posts we actually found** | Indexed posts from roughly the last 90 days, each with a relevance score and **three comment drafts written for that specific post** | Search engines index only a thin, delayed slice of LinkedIn. Good for finding people and threads worth knowing — *not* today's commenting queue. |
 
-**Why the split:** we measured it. Live web searches restricted to `linkedin.com`
+**Why both:** we measured it. Live web searches restricted to `linkedin.com`
 returned results whose newest entries were ~2 months old, with the bulk from
-2021–2023. Nothing from the past week. So the top section hands you into LinkedIn
-directly for freshness, and the bottom section uses AI where it genuinely helps.
+2021–2023. Nothing from the past week. So the link hands you into LinkedIn
+directly for freshness, and the found posts use AI where it genuinely helps.
 
 Timing matters: LinkedIn engagement decays within roughly 48 hours, so a comment
-on a months-old post earns very little. Work the top section daily; treat the
-bottom as background research.
+on a months-old post earns very little. Work the live search links daily; treat
+the listed posts as background research.
 
 There is nothing to install. Commenting stays manual and human — you comment on
 LinkedIn logged in as yourself.
@@ -28,15 +29,16 @@ LinkedIn logged in as yourself.
 ## For the two of you (daily use)
 
 1. **Bookmark the dashboard:** `https://milosevic16.github.io/linkedin-searches/`
-2. **Start at the top.** For each topic, expand *"comment angles"* to load your
-   talking points, then click **Past 24 hours ↗**. LinkedIn opens showing today's
-   posts on that topic, newest first. Comment on the ones worth it.
-3. **Then skim "Notable in your niche"** for people and discussions to follow.
+2. **Work one topic at a time.** Click **Past 24 hours ↗** to open LinkedIn's own
+   search for that topic, newest first, and comment on what's worth it. Expand
+   *"general angles"* first if you want talking points to hand.
+3. **Then work the posts listed underneath.** Each one has its own three drafts,
+   written for that post — expand *"comments written for this post"* and copy.
    **NEW** marks anything not shown on a previous run.
 4. **Always adapt a draft before posting** — two accounts pasting identical
    comments is the fastest way to look like bots.
 5. Want it refreshed right now? Actions tab → **Build dashboard** → *Run
-   workflow* (needs a GitHub account with access to this repo).
+   workflow* → pick **gather** (needs a GitHub account with access to this repo).
 
 > You must be **logged in to LinkedIn** in the same browser for the top links to
 > work. If a link shows a login wall, log in and click it again.
@@ -46,6 +48,21 @@ LinkedIn logged in as yourself.
 Everything lives in [`config.yml`](config.yml) — keywords, who you are, comment
 tone, freshness window. Edit it directly on GitHub (pencil icon → commit); the
 dashboard rebuilds itself in ~2 minutes. No coding involved.
+
+**Editing config is cheap.** The gathered posts are stored in `data/latest.json`,
+so a rebuild only redoes the stage whose inputs actually changed:
+
+| You edit | What re-runs | Cost |
+|---|---|---|
+| `min_relevance`, wording, layout | the page only | **free** |
+| `voice`, `profile` | re-scores and re-drafts the stored posts | no searching |
+| `keywords`, `notable_days`, `searches_per_keyword` | a full search | full run |
+
+So you can iterate on comment tone as often as you like without paying to search
+LinkedIn again each time. The daily scheduled run always does a full gather.
+
+Each build prints a cost table to the Actions log — tokens per stage and an
+estimate in USD and EUR — and the page footer shows what that run cost.
 
 ---
 
@@ -97,16 +114,31 @@ If the secret is missing, the dashboard still deploys — it shows a friendly
 
 ```
 .github/workflows/dashboard.yml   schedule + manual button → build → deploy to Pages
-config.yml                        keywords, profile, voice, thresholds
+config.yml                        keywords, profile, voice, thresholds, models
+scripts/build.py                  orchestrates; picks gather / redraft / render
+scripts/store.py                  data/latest.json + the fingerprint that decides
+                                  which stage actually needs to re-run
 scripts/launcher.py               LinkedIn search deep-links (datePosted +
-                                  sortBy=date_posted) + reusable comment angles
+                                  sortBy=date_posted) + general comment angles
 scripts/search_claude.py          Claude web_search tool (allowed_domains:
-                                  linkedin.com) → notable post URLs + snippets
+                                  linkedin.com) → post URLs + snippets. Runs on
+                                  search_model (Sonnet) — it is the mechanical step
 scripts/enrich.py                 Claude (claude-opus-5, structured outputs):
-                                  relevance 0–10 + reason + 2–3 comment drafts
+                                  relevance 0–10 + reason + 3 per-post drafts
+scripts/usage.py                  token accounting → cost table in the build log
 scripts/render.py                 static HTML dashboard + data.json (remembers
                                   previously-shown URLs → NEW badges)
 ```
+
+- **Gathering and rendering are separate.** Searching is the only expensive part,
+  so its output is stored in `data/latest.json` and committed back by the
+  workflow. Rebuilding the page from that data costs nothing. See the table under
+  *Changing what it searches for*.
+- **Cost control, in descending order of impact:** the pause-turn resume loop is
+  prompt-cached (without it every resume re-billed every search result already
+  gathered); the search step runs on Sonnet at medium effort rather than Opus at
+  the default high effort with thinking on; the scoring system prompt is cached
+  across batches. Scoring and drafting stay on Opus — that is the output you read.
 
 - **No hallucinated links:** URLs come from the search tool's own result blocks,
   not from Claude's prose. Anything the model mentions that the search did not
@@ -115,8 +147,8 @@ scripts/render.py                 static HTML dashboard + data.json (remembers
   count is not adjustable — the API bills per *search*, not per result. So the
   only lever on volume is `searches_per_keyword` in `config.yml` (each phrased
   differently to widen the net). The "Notable" section is often small, or empty
-  on niche keywords; that is the index being thin, not a bug. The top section
-  never runs dry, because LinkedIn answers those queries itself.
+  on niche keywords; that is the index being thin, not a bug. The live search
+  links never run dry, because LinkedIn answers those queries itself.
 - **Only vouched-for posts are shown.** The model applies the recency and quality
   rules and returns a filtered list; the raw result set (full of 2021–2023 posts)
   is used solely as a URL whitelist. If it finds nothing suitable it returns an
@@ -138,5 +170,12 @@ scripts/render.py                 static HTML dashboard + data.json (remembers
 ```bash
 pip install -r requirements.txt
 python scripts/build.py --sample        # offline preview, no API key needed
-ANTHROPIC_API_KEY=… python scripts/build.py
+
+ANTHROPIC_API_KEY=… python scripts/build.py --gather    # full run, costs money
+ANTHROPIC_API_KEY=… python scripts/build.py --redraft   # re-score stored posts
+ANTHROPIC_API_KEY=… python scripts/build.py --render    # rebuild page, free
+ANTHROPIC_API_KEY=… python scripts/build.py --auto      # cheapest sufficient mode
 ```
+
+`--render` and `--redraft` need a `data/latest.json` to work from; without one
+they fall back to gathering and say so. Every run prints a cost table at the end.

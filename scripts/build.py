@@ -1,8 +1,16 @@
-"""Build the dashboard end-to-end: search → enrich → render.
+"""Build the dashboard.
+
+Gathering posts costs money; rendering the page does not. These are separate
+stages so that rebuilding the site does not re-run the searches.
 
 Usage:
-  python scripts/build.py            # real run (needs ANTHROPIC_API_KEY)
-  python scripts/build.py --sample   # offline preview with bundled sample data
+  python scripts/build.py --gather    # full run: search, score, draft, render
+  python scripts/build.py --redraft   # re-score stored posts (voice changed)
+  python scripts/build.py --render    # rebuild the page only — no API calls
+  python scripts/build.py --auto      # pick the cheapest sufficient mode
+  python scripts/build.py --sample    # offline preview with bundled sample data
+
+With no flag it gathers, so a plain scheduled run behaves as it always has.
 """
 
 from __future__ import annotations
@@ -10,16 +18,19 @@ from __future__ import annotations
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import yaml
 
+import store
 from enrich import enrich_posts
 from launcher import build_launcher
 from render import render
 from search_claude import search_posts
+from usage import Usage
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -29,39 +40,118 @@ def load_config() -> dict:
         return yaml.safe_load(fh) or {}
 
 
+def _mode_from_argv(argv: list[str]) -> str:
+    for flag, mode in (
+        ("--gather", store.GATHER),
+        ("--redraft", store.REDRAFT),
+        ("--render", store.RENDER),
+    ):
+        if flag in argv:
+            return mode
+    return "auto" if "--auto" in argv else store.GATHER
+
+
+def _run_sample(cfg: dict) -> int:
+    posts = json.loads((ROOT / "scripts" / "sample_posts.json").read_text(encoding="utf-8"))
+    topics, _ = build_launcher(cfg)  # links need no API key
+    render(
+        posts,
+        cfg,
+        warnings=["Sample data — this is an offline preview. The LinkedIn links above are real."],
+        topics=topics,
+    )
+    print(f"Sample dashboard written to {ROOT / 'site' / 'index.html'}")
+    return 0
+
+
 def main() -> int:
     cfg = load_config()
 
     if "--sample" in sys.argv:
-        posts = json.loads((ROOT / "scripts" / "sample_posts.json").read_text(encoding="utf-8"))
-        topics, _ = build_launcher(cfg)  # links need no API key
-        render(
-            posts,
-            cfg,
-            warnings=["Sample data — this is an offline preview. The LinkedIn links above are real."],
-            topics=topics,
-        )
-        print(f"Sample dashboard written to {ROOT / 'site' / 'index.html'}")
-        return 0
+        return _run_sample(cfg)
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("::warning::ANTHROPIC_API_KEY not set — rendering setup page.")
         render([], cfg, warnings=[], configured=False, topics=build_launcher(cfg)[0])
         return 0
 
-    # 1. Fresh half: deep links into LinkedIn's own search + reusable angles.
-    topics, warnings = build_launcher(cfg)
-    print(f"Prepared {len(topics)} live search links.")
+    stored = store.load()
+    mode = _mode_from_argv(sys.argv)
+    if mode == "auto":
+        mode, reason = store.decide_mode(cfg, stored)
+        print(f"Auto mode: {mode} — {reason}.")
+    elif mode in (store.REDRAFT, store.RENDER) and stored is None:
+        print(f"::warning::No stored data to {mode} from — gathering instead.")
+        mode = store.GATHER
 
-    # 2. Notable half: what web search can actually see (weeks/months old).
-    posts, search_warnings = search_posts(cfg)
-    warnings += search_warnings
-    print(f"Found {len(posts)} notable posts.")
+    usage = Usage()
+    warnings: list[str] = []
+    now = datetime.now(timezone.utc).isoformat()
 
-    posts, enrich_warnings = enrich_posts(posts, cfg)
-    warnings += enrich_warnings
+    if mode == store.GATHER:
+        # 1. Fresh half: deep links into LinkedIn's own search + reusable angles.
+        topics, w = build_launcher(cfg, usage=usage)
+        warnings += w
+        print(f"Prepared {len(topics)} live search links.")
 
-    render(posts, cfg, warnings=warnings, configured=True, topics=topics)
+        # 2. Notable half: what web search can actually see (weeks/months old).
+        posts, w = search_posts(cfg, usage=usage)
+        warnings += w
+        print(f"Found {len(posts)} notable posts.")
+
+        posts, w = enrich_posts(posts, cfg, usage=usage)
+        warnings += w
+        gathered_at = now
+
+    elif mode == store.REDRAFT:
+        posts = stored.get("posts") or []
+        gathered_at = stored.get("generated_at") or now
+        print(f"Re-scoring {len(posts)} stored posts — no searching.")
+        for post in posts:  # drop the old judgement so it is genuinely redone
+            post.pop("relevance", None)
+            post.pop("reason", None)
+            post.pop("comments", None)
+        topics, w = build_launcher(cfg, usage=usage)  # angles follow the voice too
+        warnings += w
+        posts, w = enrich_posts(posts, cfg, usage=usage)
+        warnings += w
+
+    else:  # RENDER
+        posts = stored.get("posts") or []
+        topics = stored.get("topics") or []
+        warnings += stored.get("warnings") or []
+        gathered_at = stored.get("generated_at") or now
+        print(f"Rendering {len(posts)} stored posts — no API calls.")
+
+    # Render first so the is_new flags it sets get persisted, but save in a
+    # finally: a rendering bug must not throw away searches we already paid
+    # for. Re-running with --render then rebuilds the page for free.
+    try:
+        render(
+            posts,
+            cfg,
+            warnings=warnings,
+            configured=True,
+            topics=topics,
+            usage=usage.summary() if mode != store.RENDER else (stored.get("usage") or {}),
+            gathered_at=gathered_at,
+            mark_new=(mode == store.GATHER),
+        )
+    finally:
+        if mode != store.RENDER:
+            store.save(
+                cfg=cfg,
+                topics=topics,
+                posts=posts,
+                warnings=warnings,
+                usage=usage.summary(),
+                generated_at=gathered_at,
+            )
+            print(f"Stored run data in {store.DATA_PATH.relative_to(ROOT)}")
+
+    print()
+    print(usage.report())
+    print()
     for w in warnings:
         print(f"::warning::{w}")
     print(f"Dashboard written to {ROOT / 'site' / 'index.html'}")

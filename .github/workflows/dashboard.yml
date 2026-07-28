@@ -5,12 +5,29 @@ on:
     # 05:30 UTC = 07:30 Ljubljana (summer) / 06:30 (winter), Monday–Friday.
     # Edit the cron line to change when the dashboard refreshes.
     - cron: "30 5 * * 1-5"
-  workflow_dispatch: {}   # "Run workflow" button in the Actions tab
+
+  workflow_dispatch:      # "Run workflow" button in the Actions tab
+    inputs:
+      mode:
+        description: "What to run"
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto      # decide from what changed in config.yml
+          - gather    # search LinkedIn again (full cost)
+          - redraft   # re-score stored posts (no searching)
+          - render    # rebuild the page only (free)
+
   push:
     branches: [main]      # rebuild whenever config.yml (or code) changes
+    paths-ignore:
+      # The job commits data/latest.json back to the repo. Without this the
+      # commit would trigger another run, which would commit again, forever.
+      - "data/**"
 
 permissions:
-  contents: read
+  contents: write   # needed to commit data/latest.json back
   pages: write
   id-token: write
 
@@ -34,10 +51,41 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      # Searching costs money; rendering does not. A scheduled run is the one
+      # that should genuinely go and look for new posts. A push is usually
+      # someone editing config.yml, so let build.py work out the cheapest
+      # sufficient mode from what actually changed.
+      - name: Choose build mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "flag=--gather" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "flag=--${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=--auto" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build dashboard
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python scripts/build.py
+        run: python scripts/build.py ${{ steps.mode.outputs.flag }}
+
+      # Persist the gathered posts so later rebuilds can skip the searching.
+      - name: Store gathered data
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Stage first: on the very first run data/latest.json is untracked,
+          # and an unstaged `git diff` reports no change for a new file.
+          git add data/
+          if git diff --cached --quiet -- data/; then
+            echo "No change to stored data."
+            exit 0
+          fi
+          git commit -m "Store dashboard data for $(date -u +%Y-%m-%d)"
+          git push
 
       # Pages must already be enabled: Settings -> Pages -> Source: GitHub Actions.
       # A workflow token cannot create the Pages site itself ("Resource not

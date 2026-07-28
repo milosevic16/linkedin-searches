@@ -1,8 +1,16 @@
 """Render the dashboard: site/index.html + site/data.json.
 
-The previous deploy's data.json (fetched from the live GitHub Pages URL)
-is used to remember which post URLs were already shown, so repeats from
-overlapping search windows don't get flagged as new again.
+The page is organised by TOPIC. Each topic gets one section containing:
+  - a deep link into LinkedIn's own search, for posts published today
+  - the posts we actually found for that topic, each with three comment
+    drafts written for that specific post
+
+The general per-topic "angles" are kept, but subordinated: they only exist
+because we cannot read the posts behind the live search link (LinkedIn
+blocks crawlers), so for those there is nothing to tailor a draft to.
+
+site/data.json carries the URLs already shown, fetched back from the live
+Pages deploy on the next run so repeats aren't re-flagged as new.
 """
 
 from __future__ import annotations
@@ -54,9 +62,30 @@ def _esc(text: str) -> str:
     return html.escape(str(text or ""), quote=True)
 
 
+def _slug(text: str) -> str:
+    keep = [c.lower() if c.isalnum() else "-" for c in str(text or "")]
+    return "".join(keep).strip("-")[:60] or "topic"
+
+
 _SCORE_CLASS = lambda r: "s-high" if r >= 8 else ("s-mid" if r >= 5 else "s-low")
 
 _STYLE_LABEL = {"insight": "Insight", "question": "Question", "experience": "Experience"}
+
+
+def _drafts_block(items: list[dict], summary: str, open_by_default: bool) -> str:
+    """Shared markup for per-post drafts and per-topic angles."""
+    if not items:
+        return ""
+    rows = "".join(
+        f"""<div class="draft">
+          <div class="draft-head"><span class="draft-style">{_esc(label)}</span>
+          <button class="copy" type="button">Copy</button></div>
+          <p class="draft-text">{_esc(text)}</p>
+        </div>"""
+        for label, text in items
+    )
+    return f"""<details class="drafts"{" open" if open_by_default else ""}>
+      <summary>{_esc(summary)}</summary>{rows}</details>"""
 
 
 def _card(post: dict) -> str:
@@ -68,29 +97,26 @@ def _card(post: dict) -> str:
     )
     author = _esc(post.get("author") or "Unknown author")
     kind = "Article" if post.get("is_article") else "Post"
-    chips = "".join(f'<span class="chip">{_esc(k)}</span>' for k in post.get("keywords") or [])
     new_chip = '<span class="chip chip-new">NEW</span>' if post.get("is_new") else ""
+    # Only the *other* topics this post matched — its own section is implied.
+    extra = [k for k in (post.get("keywords") or [])[1:]]
+    chips = "".join(f'<span class="chip">also: {_esc(k)}</span>' for k in extra)
     reason = post.get("reason")
     reason_html = f'<p class="reason">{_esc(reason)}</p>' if reason else ""
 
-    drafts = ""
-    comments = post.get("comments") or []
-    if comments:
-        items = "".join(
-            f"""<div class="draft">
-              <div class="draft-head"><span class="draft-style">{_esc(_STYLE_LABEL.get(c.get("style"), "Idea"))}</span>
-              <button class="copy" type="button">Copy</button></div>
-              <p class="draft-text">{_esc(c.get("text"))}</p>
-            </div>"""
-            for c in comments
-        )
-        drafts = f"""<details class="drafts">
-          <summary>{len(comments)} comment idea{"s" if len(comments) != 1 else ""}</summary>
-          {items}
-        </details>"""
+    comments = [
+        (_STYLE_LABEL.get(c.get("style"), "Idea"), c.get("text"))
+        for c in (post.get("comments") or [])
+    ]
+    drafts = _drafts_block(
+        comments,
+        f"{len(comments)} comment{'s' if len(comments) != 1 else ''} written for this post",
+        open_by_default=False,
+    )
+    if not comments:
+        drafts = '<p class="nodraft">No drafts for this post — it fell outside this run\'s drafting budget.</p>'
 
-    kws = "|".join(post.get("keywords") or [])
-    return f"""<article class="card" data-kws="{_esc(kws)}" data-new="{1 if post.get("is_new") else 0}">
+    return f"""<article class="card" data-new="{1 if post.get("is_new") else 0}">
       <div class="card-head">
         {score}
         <div class="card-id">
@@ -106,43 +132,68 @@ def _card(post: dict) -> str:
     </article>"""
 
 
-def _launcher_section(topics: list[dict]) -> str:
-    """Deep links into LinkedIn's own search — the only reliably fresh source."""
-    if not topics:
-        return ""
-    blocks = []
-    for t in topics:
-        angles = "".join(
-            f"""<div class="draft">
-              <div class="draft-head"><span class="draft-style">{_esc(a["label"])}</span>
-              <button class="copy" type="button">Copy</button></div>
-              <p class="draft-text">{_esc(a["text"])}</p>
-            </div>"""
-            for a in t.get("angles") or []
-        )
-        angles_html = (
-            f"""<details class="drafts"><summary>{len(t["angles"])} comment angles for this topic</summary>{angles}</details>"""
-            if t.get("angles")
-            else ""
-        )
-        blocks.append(
-            f"""<article class="card topic">
-              <div class="card-head">
-                <div class="card-id">
-                  <div class="author">{_esc(t["keyword"])}</div>
-                  <div class="title">Opens LinkedIn search · {_esc(t["window_label"])} · newest first</div>
-                </div>
-                <a class="open" href="{_esc(t["fresh_url"])}" target="_blank" rel="noopener">{_esc(t["window_label"])}&nbsp;↗</a>
-                <a class="open alt" href="{_esc(t["week_url"])}" target="_blank" rel="noopener">Past week&nbsp;↗</a>
-              </div>
-              {angles_html}
-            </article>"""
-        )
-    return f"""<section class="block">
-      <h2 class="block-h">Fresh posts — comment today</h2>
-      <p class="block-sub">These open LinkedIn's own search, which sees posts that search engines never index.
-      You must be logged in to LinkedIn. Comment while the post is young — engagement dies after about 48 hours.</p>
-      <div class="cards">{"".join(blocks)}</div>
+def _group_by_topic(posts: list[dict], topics: list[dict]) -> dict[str, list[dict]]:
+    """Each post belongs to ONE topic — its first matched keyword — so a post
+    matching three keywords doesn't render three times. The other matches show
+    as chips on the card."""
+    known = {t["keyword"] for t in topics}
+    grouped: dict[str, list[dict]] = {t["keyword"]: [] for t in topics}
+    for post in posts:
+        keywords = post.get("keywords") or []
+        primary = next((k for k in keywords if k in known), None)
+        grouped.setdefault(primary or "Other matches", []).append(post)
+    return grouped
+
+
+def _topic_section(topic: dict, posts: list[dict], min_rel: int) -> str:
+    angles = [(a.get("label") or "Angle", a.get("text")) for a in topic.get("angles") or []]
+    angles_html = _drafts_block(
+        angles,
+        f"{len(angles)} general angles — for the posts behind the link above, which we cannot read",
+        open_by_default=False,
+    )
+
+    def sort_key(p: dict):
+        rel = p.get("relevance")
+        return (-(rel if isinstance(rel, int) else -1), 0 if p.get("is_new") else 1)
+
+    ordered = sorted(posts, key=sort_key)
+    drafted = [p for p in ordered if p.get("comments")]
+    top = [p for p in ordered if not isinstance(p.get("relevance"), int) or p["relevance"] >= min_rel]
+    rest = [p for p in ordered if p not in top]
+
+    if top:
+        cards = "".join(_card(p) for p in top)
+    else:
+        cards = """<p class="empty-topic">Nothing indexed for this topic this run.
+        The live search link above still works — it queries LinkedIn directly.</p>"""
+
+    rest_html = ""
+    if rest:
+        rest_html = f"""<details class="lowrel">
+          <summary>Lower relevance ({len(rest)})</summary>{"".join(_card(p) for p in rest)}</details>"""
+
+    n_new = sum(1 for p in posts if p.get("is_new"))
+    count_bits = [f"{len(posts)} post{'s' if len(posts) != 1 else ''} found"]
+    if drafted:
+        count_bits.append(f"{len(drafted)} with drafts")
+    if n_new:
+        count_bits.append(f"{n_new} new")
+
+    return f"""<section class="topic-block" id="t-{_slug(topic['keyword'])}" data-new="{1 if n_new else 0}">
+      <div class="topic-head">
+        <div class="topic-id">
+          <h2 class="topic-h">{_esc(topic['keyword'])}</h2>
+          <p class="topic-meta">{_esc(" · ".join(count_bits))}</p>
+        </div>
+        <div class="topic-links">
+          <a class="open" href="{_esc(topic['fresh_url'])}" target="_blank" rel="noopener">{_esc(topic['window_label'])}&nbsp;↗</a>
+          <a class="open alt" href="{_esc(topic['week_url'])}" target="_blank" rel="noopener">Past week&nbsp;↗</a>
+        </div>
+      </div>
+      {angles_html}
+      <div class="cards">{cards}</div>
+      {rest_html}
     </section>"""
 
 
@@ -166,85 +217,88 @@ def render(
     warnings: list[str],
     configured: bool = True,
     topics: list[dict] | None = None,
+    usage: dict | None = None,
+    gathered_at: str | None = None,
+    mark_new: bool = True,
 ) -> None:
     site = Path(__file__).resolve().parent.parent / "site"
     site.mkdir(exist_ok=True)
+    topics = topics or []
 
+    # Always load the history — it gets written back below, so skipping the
+    # load would silently truncate it on a render-only rebuild. Only the
+    # is_new *decision* is skipped: on a rebuild the posts are unchanged, and
+    # re-deciding would mark everything as already-seen and drop the flags.
     prev_seen = _load_previous_seen()
     seen_set = set(prev_seen)
-    for p in posts:
-        p["is_new"] = p["url"] not in seen_set
+    if mark_new:
+        for p in posts:
+            p["is_new"] = p["url"] not in seen_set
 
     now = datetime.now(_TZ)
     generated = now.strftime("%A, %d %b %Y · %H:%M")
+    gathered_label = ""
+    if gathered_at:
+        try:
+            when = datetime.fromisoformat(gathered_at).astimezone(_TZ)
+            if (now - when).total_seconds() > 3600:
+                gathered_label = f" · posts last gathered {when.strftime('%d %b, %H:%M')}"
+        except ValueError:
+            pass
 
     min_rel = int(cfg.get("min_relevance", 5))
-    any_scored = any(isinstance(p.get("relevance"), int) for p in posts)
-
-    def sort_key(p: dict):
-        rel = p.get("relevance")
-        return (-(rel if isinstance(rel, int) else -1), 0 if p.get("is_new") else 1)
-
-    posts_sorted = sorted(posts, key=sort_key)
-    if any_scored:
-        top = [p for p in posts_sorted if isinstance(p.get("relevance"), int) and p["relevance"] >= min_rel]
-        rest = [p for p in posts_sorted if p not in top]
-    else:
-        top, rest = posts_sorted, []
-
-    keywords = sorted({k for p in posts for k in (p.get("keywords") or [])})
     n_new = sum(1 for p in posts if p.get("is_new"))
+    n_drafted = sum(1 for p in posts if p.get("comments"))
 
-    # ── page pieces ──────────────────────────────────────────────────
     warn_html = ""
     if warnings:
         items = "".join(f"<li>{_esc(w)}</li>" for w in warnings)
         warn_html = f'<section class="notice warn"><ul>{items}</ul></section>'
 
-    launcher_html = _launcher_section(topics or [])
-
     if not configured:
         body_main = _setup_section()
-    elif not posts:
-        days = (cfg.get("search") or {}).get("notable_days", 90)
-        body_main = launcher_html + f"""<section class="notice empty">
-          <h2>No notable posts surfaced this run</h2>
-          <p>Nothing matching your keywords turned up in the last {days} days of indexed posts.
-          The links above still work — they query LinkedIn directly. To widen this section,
-          add keywords or raise <code>notable_days</code> in <code>config.yml</code>.</p>
-        </section>"""
     else:
-        chip_buttons = "".join(
-            f'<button class="fchip" data-filter="kw:{_esc(k)}" type="button">{_esc(k)}</button>' for k in keywords
+        grouped = _group_by_topic(posts, topics)
+        blocks = [_topic_section(t, grouped.get(t["keyword"], []), min_rel) for t in topics]
+        leftovers = grouped.get("Other matches") or []
+        if leftovers:
+            blocks.append(
+                f"""<section class="topic-block" id="t-other">
+                  <div class="topic-head"><div class="topic-id">
+                    <h2 class="topic-h">Other matches</h2>
+                    <p class="topic-meta">Found under keywords no longer in config.yml</p>
+                  </div></div>
+                  <div class="cards">{"".join(_card(p) for p in leftovers)}</div>
+                </section>"""
+            )
+        nav = "".join(
+            f'<a class="navchip" href="#t-{_slug(t["keyword"])}">{_esc(t["keyword"])}</a>' for t in topics
         )
-        filters = f"""<nav class="filters">
-          <button class="fchip active" data-filter="all" type="button">All</button>
-          <button class="fchip" data-filter="new" type="button">New today</button>
-          {chip_buttons}
-        </nav>"""
-        cards_top = "".join(_card(p) for p in top)
-        rest_html = ""
-        if rest:
-            rest_html = f"""<details class="lowrel">
-              <summary>Lower relevance ({len(rest)})</summary>
-              {"".join(_card(p) for p in rest)}
-            </details>"""
-        notable_days = (cfg.get("search") or {}).get("notable_days", 90)
-        body_main = launcher_html + f"""<section class="block">
-          <h2 class="block-h">Notable in your niche</h2>
-          <p class="block-sub">Scored posts from roughly the last {notable_days} days. Search engines index only a
-          thin, delayed slice of LinkedIn, so treat these as people and threads worth knowing —
-          not as today's commenting queue.</p>
-          {filters}
-          <div class="cards">{cards_top}</div>
-          {rest_html}
-        </section>"""
+        body_main = f"""<nav class="topicnav">{nav}</nav>
+        <div class="filters">
+          <button class="fchip active" data-filter="all" type="button">All topics</button>
+          <button class="fchip" data-filter="new" type="button">Only topics with new posts</button>
+        </div>
+        {"".join(blocks)}"""
 
     stats = f"""<div class="stats">
-      <div class="stat"><span class="stat-n">{len(topics or [])}</span><span class="stat-l">live searches</span></div>
-      <div class="stat"><span class="stat-n">{len(posts)}</span><span class="stat-l">notable posts</span></div>
+      <div class="stat"><span class="stat-n">{len(topics)}</span><span class="stat-l">topics</span></div>
+      <div class="stat"><span class="stat-n">{len(posts)}</span><span class="stat-l">posts found</span></div>
+      <div class="stat"><span class="stat-n">{n_drafted}</span><span class="stat-l">with drafts</span></div>
       <div class="stat"><span class="stat-n">{n_new}</span><span class="stat-l">new since last run</span></div>
     </div>"""
+
+    cost_note = ""
+    if usage and usage.get("usd"):
+        cost_note = (
+            f'This run cost about USD {usage["usd"]:.2f} '
+            f'(≈ EUR {usage.get("eur", 0):.2f}) in API usage across '
+            f'{usage.get("calls", 0)} calls and {usage.get("searches", 0)} web searches.<br>'
+        )
+    elif usage is not None and not usage.get("usd"):
+        cost_note = "This page was rebuilt from stored data — no API calls, no cost.<br>"
+
+    repo = os.environ.get("GITHUB_REPOSITORY", "milosevic16/linkedin-searches")
 
     page = f"""<!doctype html>
 <html lang="en">
@@ -275,22 +329,34 @@ body {{
   margin: 0; background: var(--bg); color: var(--ink);
   font: 15px/1.55 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }}
-.wrap {{ max-width: 780px; margin: 0 auto; padding: 24px 16px 64px; }}
+.wrap {{ max-width: 820px; margin: 0 auto; padding: 24px 16px 64px; }}
 header h1 {{ font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }}
 .sub {{ color: var(--ink-2); font-size: 13px; margin: 0 0 18px; }}
 .stats {{ display: flex; gap: 10px; margin: 0 0 18px; flex-wrap: wrap; }}
 .stat {{ background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
-  padding: 8px 14px; display: flex; flex-direction: column; min-width: 96px; box-shadow: var(--shadow); }}
+  padding: 8px 14px; display: flex; flex-direction: column; min-width: 92px; box-shadow: var(--shadow); }}
 .stat-n {{ font-size: 20px; font-weight: 650; }}
 .stat-l {{ font-size: 12px; color: var(--ink-2); }}
-.filters {{ display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }}
+.topicnav {{ display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px;
+  padding-bottom: 14px; border-bottom: 1px solid var(--line); }}
+.navchip {{ font-size: 12.5px; color: var(--ink-2); text-decoration: none;
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; background: var(--surface); }}
+.navchip:hover {{ color: var(--accent); border-color: var(--accent); }}
+.filters {{ display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 20px; }}
 .fchip {{ background: var(--surface); color: var(--ink-2); border: 1px solid var(--line);
   border-radius: 999px; padding: 5px 12px; font-size: 13px; cursor: pointer; }}
 .fchip.active {{ background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }}
+.topic-block {{ margin: 0 0 34px; scroll-margin-top: 12px; }}
+.topic-block.hidden {{ display: none; }}
+.topic-head {{ display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap;
+  margin-bottom: 10px; padding-bottom: 10px; border-bottom: 2px solid var(--line); }}
+.topic-id {{ flex: 1; min-width: 220px; }}
+.topic-h {{ font-size: 17px; margin: 0; letter-spacing: -.01em; }}
+.topic-meta {{ color: var(--ink-2); font-size: 12.5px; margin: 3px 0 0; }}
+.topic-links {{ display: flex; gap: 8px; flex-wrap: wrap; }}
 .cards {{ display: flex; flex-direction: column; gap: 14px; }}
 .card {{ background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   padding: 14px 16px; box-shadow: var(--shadow); }}
-.card.hidden {{ display: none; }}
 .card-head {{ display: flex; gap: 12px; align-items: flex-start; }}
 .card-id {{ flex: 1; min-width: 0; }}
 .score {{ flex: none; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
@@ -305,11 +371,6 @@ header h1 {{ font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }}
 .open {{ flex: none; background: var(--accent); color: var(--accent-ink); text-decoration: none;
   border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }}
 .open.alt {{ background: transparent; color: var(--accent); border: 1px solid var(--accent); }}
-.block {{ margin-bottom: 30px; }}
-.block-h {{ font-size: 17px; margin: 0 0 4px; }}
-.block-sub {{ color: var(--ink-2); font-size: 13px; margin: 0 0 14px; }}
-.card.topic .author {{ font-size: 15px; }}
-.card.topic .card-head {{ align-items: center; flex-wrap: wrap; }}
 .snippet {{ margin: 10px 0 6px; color: var(--ink); font-size: 14px; }}
 .reason {{ margin: 0 0 8px; color: var(--ink-2); font-size: 13px; font-style: italic; }}
 .chips {{ display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }}
@@ -318,6 +379,7 @@ header h1 {{ font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }}
 .chip-new {{ background: var(--new-bg); color: var(--new-ink); border-color: var(--new-bg); font-weight: 700; }}
 .drafts {{ margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }}
 .drafts summary {{ cursor: pointer; color: var(--accent); font-size: 13.5px; font-weight: 600; }}
+.topic-block > .drafts {{ margin: 0 0 14px; border-top: none; padding-top: 0; }}
 .draft {{ background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
   padding: 10px 12px; margin-top: 10px; }}
 .draft-head {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }}
@@ -326,8 +388,10 @@ header h1 {{ font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }}
   border-radius: 7px; padding: 3px 10px; font-size: 12px; cursor: pointer; }}
 .copy.done {{ color: var(--good-ink); border-color: var(--good-ink); }}
 .draft-text {{ margin: 0; font-size: 14px; white-space: pre-wrap; }}
-.lowrel {{ margin-top: 22px; }}
-.lowrel summary {{ cursor: pointer; color: var(--ink-2); font-size: 14px; margin-bottom: 12px; }}
+.nodraft, .empty-topic {{ color: var(--ink-3); font-size: 13px; margin: 8px 0 0; font-style: italic; }}
+.empty-topic {{ padding: 10px 2px; }}
+.lowrel {{ margin-top: 14px; }}
+.lowrel summary {{ cursor: pointer; color: var(--ink-2); font-size: 13.5px; }}
 .lowrel .card {{ margin-top: 12px; opacity: .85; }}
 .notice {{ background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   padding: 16px 18px; margin-bottom: 16px; }}
@@ -343,13 +407,13 @@ code {{ background: var(--low-bg); border-radius: 5px; padding: 1px 5px; font-si
 <div class="wrap">
   <header>
     <h1>LinkedIn Comment Radar</h1>
-    <p class="sub">Your LinkedIn commenting shortlist · updated {_esc(generated)}</p>
+    <p class="sub">Your LinkedIn commenting shortlist · updated {_esc(generated)}{_esc(gathered_label)}</p>
   </header>
   {stats}
   {warn_html}
   {body_main}
-  <footer>Adapt every draft before posting — identical comments from two accounts read as bots.<br>
-  Topics and voice live in <a href="https://github.com/{_esc(os.environ.get("GITHUB_REPOSITORY", "milosevic16/linkedin-searches"))}/blob/main/config.yml">config.yml</a>.</footer>
+  <footer>{cost_note}Adapt every draft before posting — identical comments from two accounts read as bots.<br>
+  Topics and voice live in <a href="https://github.com/{_esc(repo)}/blob/main/config.yml">config.yml</a>.</footer>
 </div>
 <script>
 document.addEventListener("click", (e) => {{
@@ -366,12 +430,9 @@ document.addEventListener("click", (e) => {{
   if (chip) {{
     document.querySelectorAll(".fchip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
-    const f = chip.dataset.filter;
-    document.querySelectorAll(".card").forEach((card) => {{
-      let show = true;
-      if (f === "new") show = card.dataset.new === "1";
-      else if (f.startsWith("kw:")) show = card.dataset.kws.split("|").includes(f.slice(3));
-      card.classList.toggle("hidden", !show);
+    const onlyNew = chip.dataset.filter === "new";
+    document.querySelectorAll(".topic-block").forEach((block) => {{
+      block.classList.toggle("hidden", onlyNew && block.dataset.new !== "1");
     }});
   }}
 }});

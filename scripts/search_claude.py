@@ -95,7 +95,7 @@ def _extract_json_array(text: str):
     return parsed if isinstance(parsed, list) else []
 
 
-def search_posts(cfg: dict) -> tuple[list[dict], list[str]]:
+def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
     """Return (posts, warnings). Each post: url, title, author, snippet, keywords."""
     warnings: list[str] = []
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -169,6 +169,8 @@ def search_posts(cfg: dict) -> tuple[list[dict], list[str]]:
                     # scopes work tightly enough to risk running fewer.
                     output_config={"effort": "medium"},
                 )
+                if usage is not None:
+                    usage.record("search", model, response)
                 # Harvest the authoritative URLs from the tool's own results.
                 for block in response.content:
                     if getattr(block, "type", "") != "web_search_tool_result":

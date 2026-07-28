@@ -11,6 +11,11 @@ import os
 
 CHUNK_SIZE = 8
 
+# Caps on what we send per post. A search snippet is meant to be 2-3 sentences;
+# anything far beyond that is a runaway result, not signal worth paying for.
+_TITLE_CHARS = 300
+_SNIPPET_CHARS = 600
+
 # Structured-output schema: guarantees valid JSON back from the model.
 _SCHEMA = {
     "type": "object",
@@ -31,7 +36,7 @@ _SCHEMA = {
                     },
                     "comments": {
                         "type": "array",
-                        "description": "2-3 ready-to-adapt comment drafts in the post's language.",
+                        "description": "Exactly 3 ready-to-adapt comment drafts written for THIS post, in the post's language.",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -69,15 +74,49 @@ For every post you receive (only a title/snippet is available, not the full text
 be seen by their target audience and make them look good? Penalise job ads, \
 company self-promotion with no discussion value, and posts that merely mention a \
 keyword without substance. Reward posts by relevant people that invite discussion.
-- Write 2-3 short comment drafts (each 1-3 sentences) in the SAME LANGUAGE as the \
-post: one adding an insight, one asking a good question, one sharing a relatable \
-angle or experience. They must stand on their own even if the snippet is partial — \
-avoid referring to specifics the snippet does not actually show.
+- Write exactly 3 short comment drafts (each 1-3 sentences) in the SAME LANGUAGE \
+as the post: one adding an insight, one asking a good question, one sharing a \
+relatable angle or experience. Write them FOR THIS SPECIFIC POST — they should \
+respond to what this author actually said, not be generic commentary on the \
+topic. They must still stand on their own if the snippet is partial, so avoid \
+referring to specifics the snippet does not actually show.
 - Keep the "reason" to one plain sentence.
 """
 
 
-def enrich_posts(posts: list[dict], cfg: dict) -> tuple[list[dict], list[str]]:
+def _spread_across_topics(posts: list[dict], limit: int) -> list[dict]:
+    """Choose which posts get drafted, cycling through topics one at a time.
+
+    Taking the first N in discovery order meant the keywords listed first in
+    config.yml ate the whole budget. Now that the dashboard is grouped by
+    topic that would leave later topics visibly empty, so spend the budget
+    round-robin: every topic gets its best post before any topic gets a
+    second one. Discovery order is preserved within a topic.
+    """
+    if len(posts) <= limit:
+        return list(posts)
+
+    buckets: dict[str, list[dict]] = {}
+    for post in posts:
+        primary = (post.get("keywords") or ["(unmatched)"])[0]
+        buckets.setdefault(primary, []).append(post)
+
+    chosen: list[dict] = []
+    while len(chosen) < limit:
+        drained = True
+        for bucket in buckets.values():
+            if not bucket:
+                continue
+            chosen.append(bucket.pop(0))
+            drained = False
+            if len(chosen) >= limit:
+                break
+        if drained:  # every topic exhausted before we hit the limit
+            break
+    return chosen
+
+
+def enrich_posts(posts: list[dict], cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
     """Attach relevance / reason / comments to each post, in place. Returns (posts, warnings)."""
     warnings: list[str] = []
     if not posts:
@@ -96,9 +135,11 @@ def enrich_posts(posts: list[dict], cfg: dict) -> tuple[list[dict], list[str]]:
     )
 
     limit = int(cfg.get("max_enriched", 30))
-    targets = posts[:limit]
-    if len(posts) > limit:
-        warnings.append(f"Only the first {limit} of {len(posts)} posts were AI-scored (max_enriched).")
+    targets = _spread_across_topics(posts, limit)
+    if len(posts) > len(targets):
+        warnings.append(
+            f"{len(targets)} of {len(posts)} posts were AI-scored, spread across topics (max_enriched)."
+        )
 
     for start in range(0, len(targets), CHUNK_SIZE):
         chunk = targets[start : start + CHUNK_SIZE]
@@ -106,8 +147,8 @@ def enrich_posts(posts: list[dict], cfg: dict) -> tuple[list[dict], list[str]]:
             {
                 "id": start + i,
                 "author": p.get("author") or "(unknown author)",
-                "title": p.get("title") or "",
-                "snippet": p.get("snippet") or "",
+                "title": (p.get("title") or "")[:_TITLE_CHARS],
+                "snippet": (p.get("snippet") or "")[:_SNIPPET_CHARS],
                 "matched_keywords": p.get("keywords") or [],
             }
             for i, p in enumerate(chunk)
@@ -147,6 +188,9 @@ def enrich_posts(posts: list[dict], cfg: dict) -> tuple[list[dict], list[str]]:
         except anthropic.APIConnectionError:
             warnings.append("Could not reach the Claude API — some posts are unscored.")
             break
+
+        if usage is not None:
+            usage.record("draft", model, response)
 
         if response.stop_reason == "refusal":
             warnings.append("Claude declined to process one batch of posts — those are unscored.")

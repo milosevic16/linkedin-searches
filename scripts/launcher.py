@@ -88,7 +88,7 @@ def search_url(keyword: str, window: str = "past-24h", newest_first: bool = True
     return SEARCH_BASE + "?" + "&".join(params)
 
 
-def build_launcher(cfg: dict) -> tuple[list[dict], list[str]]:
+def build_launcher(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
     """Return (topics, warnings). Each topic: keyword, fresh_url, week_url, angles."""
     warnings: list[str] = []
     keywords = [str(k).strip() for k in (cfg.get("keywords") or []) if str(k).strip()]
@@ -117,9 +117,13 @@ def build_launcher(cfg: dict) -> tuple[list[dict], list[str]]:
     import anthropic
 
     client = anthropic.Anthropic()
+    # Deliberately left on the main model: this is one call per run and its
+    # output is text the user pastes into LinkedIn, so it is not worth
+    # degrading to save a few cents.
+    angles_model = cfg.get("model") or "claude-opus-5"
     try:
         response = client.messages.create(
-            model=cfg.get("model") or "claude-opus-5",
+            model=angles_model,
             max_tokens=4000,
             system=_SYSTEM.format(
                 profile=(cfg.get("profile") or "").strip(),
@@ -131,6 +135,9 @@ def build_launcher(cfg: dict) -> tuple[list[dict], list[str]]:
     except Exception as exc:  # angles are a nice-to-have; links must still ship
         warnings.append(f"Could not prepare comment angles ({type(exc).__name__}) — links still work.")
         return topics, warnings
+
+    if usage is not None:
+        usage.record("angles", angles_model, response)
 
     if response.stop_reason == "refusal":
         warnings.append("Claude declined to prepare comment angles — links still work.")

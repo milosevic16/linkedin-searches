@@ -1,80 +1,99 @@
 [
   {
-    "url": "https://www.linkedin.com/posts/example-anna-kovac_fintech-regulation-eu-activity-71234",
-    "title": "The new EBA guidelines on outsourcing will hit smaller EMIs harder than anyone admits…",
-    "author": "Anna Kovač",
-    "snippet": "3 days ago … The new EBA guidelines on outsourcing will hit smaller EMIs harder than anyone admits. Compliance teams of two people cannot run a full vendor register, and yet …",
-    "keywords": ["fintech regulation"],
+    "url": "https://www.linkedin.com/posts/example-tracing-litigation-activity-71001",
+    "title": "Freezing injunctions are outrunning the tracing work behind them",
+    "author": "Claire Duffield",
+    "snippet": "2 days ago … Got a worldwide freezing order last month. By the time it was served, two thirds of the balance had already moved through a cross-chain bridge. The order was sound; the intelligence underneath it was three weeks stale …",
+    "keywords": ["crypto asset tracing litigation"],
     "is_article": false,
     "relevance": 9,
-    "reason": "A compliance leader inviting discussion on exactly the pain point your clients have.",
+    "reason": "A disputes lawyer describing the gap between legal relief and forensic timing — our strongest referral audience.",
     "comments": [
-      {"style": "insight", "text": "We see the same pattern with our EMI clients — the register itself isn't the burden, the annual re-assessment cycle is. A lightweight criticality tiering usually cuts the workload by half without weakening the audit trail."},
-      {"style": "question", "text": "Do you expect national regulators to apply proportionality here in practice, or will the guidelines be enforced uniformly regardless of team size?"},
-      {"style": "experience", "text": "When we helped a two-person compliance team through this last year, the surprise wasn't the volume of vendors — it was how many 'non-critical' tools turned out to touch client data."}
+      {"style": "insight", "text": "The sequencing matters more than most orders acknowledge: once funds cross a bridge, the relevant respondent is often a different exchange in a different jurisdiction than the one named. Tracing before the application rather than after changes who you name."},
+      {"style": "question", "text": "When the order was served, did you have current attribution on the destination cluster, or was it based on the position at filing? The gap between those two dates is usually where recovery is won or lost."},
+      {"style": "experience", "text": "We see the same pattern — the legal instrument is fine, the underlying picture is weeks old. Refreshing attribution immediately before service is unglamorous, and it is often what makes the order enforceable."}
     ]
   },
   {
-    "url": "https://www.linkedin.com/posts/example-marko-b_digitalbanking-slovenia-activity-71422",
-    "title": "Slovenija je dobila novo digitalno banko — ampak ali jo sploh potrebujemo?",
-    "author": "Marko Breznik",
-    "snippet": "2 days ago … Slovenija je dobila novo digitalno banko. Ampak ali jo sploh potrebujemo? Poglejmo številke: 87 % Slovencev že uporablja mobilno banko …",
-    "keywords": ["digital banking Slovenia"],
+    "url": "https://www.linkedin.com/posts/example-divorce-disclosure-activity-71002",
+    "title": "Non-disclosure in financial remedy cases now has a wallet-shaped hole in it",
+    "author": "Petra Zalar",
+    "snippet": "4 days ago … Family practitioners are getting comfortable asking about crypto on Form E, but asking is not the same as knowing what to do with a wallet address once you have one. Two cases this year turned on whether a disclosed address actually held the value …",
+    "keywords": ["hidden crypto assets divorce"],
     "is_article": false,
     "relevance": 8,
-    "reason": "Local, high-engagement debate squarely in your market — good visibility opportunity.",
+    "reason": "Family law practitioner naming a concrete procedural gap where forensic input is decisive.",
     "comments": [
-      {"style": "insight", "text": "Odlična analiza. Ampak številka, ki manjka: koliko od teh 87 % uporablja mobilno banko za kaj več kot vpogled v stanje? Prava priložnost za izzivalce ni v aplikaciji, ampak v produktih, ki jih tradicionalne banke ne ponujajo."},
-      {"style": "question", "text": "Kaj misliš, da je večja ovira za novo banko pri nas — regulatorni stroški ali navade uporabnikov?"}
+      {"style": "insight", "text": "A disclosed address is a starting point, not an answer — it is common for it to be a spending account while value sits one hop away in a cluster the same party controls. Clustering is what turns disclosure into evidence."},
+      {"style": "question", "text": "In those two cases, did the discrepancy surface from the respondent's own disclosure or from exchange records obtained separately? The route matters for how others should frame their requests."},
+      {"style": "experience", "text": "The pattern we see most in financial remedy work is not a hidden wallet but a disclosed one that is deliberately empty. Asking for full transaction history rather than a balance closes most of that gap."}
     ]
   },
   {
-    "url": "https://www.linkedin.com/pulse/mica-transition-period-what-casps-need-know-example-jelena",
-    "title": "MiCA transition period: what CASPs need to know before December",
-    "author": "Jelena Novak",
-    "snippet": "5 days ago … With the MiCA transition period closing, crypto-asset service providers face a choice: file now under the national regime or wait …",
-    "keywords": ["MiCA crypto licensing"],
+    "url": "https://www.linkedin.com/posts/example-sof-verification-activity-71003",
+    "title": "Source of funds checks on crypto are still mostly assertion with a screenshot attached",
+    "author": "Daniel Weiss",
+    "snippet": "1 week ago … Reviewed a stack of SoF files this quarter. Most consisted of an exchange balance screenshot and a customer explanation. That is not provenance. Regulators are going to start asking what sits behind the screenshot …",
+    "keywords": ["crypto source of funds verification", "AML crypto exchange compliance"],
+    "is_article": false,
+    "relevance": 9,
+    "reason": "A compliance lead describing precisely the trigger for source-of-funds work.",
+    "comments": [
+      {"style": "insight", "text": "The distinction worth drawing in a file is between where funds are now and where they demonstrably came from. A balance screenshot evidences custody at a point in time and nothing about origin — only one of those is the regulator's question."},
+      {"style": "question", "text": "Are you seeing pressure to evidence provenance across the full chain history, or only back to the last fiat on-ramp? That scope question seems to be where institutions are landing very differently."},
+      {"style": "experience", "text": "Where files hold up under scrutiny, it is usually because someone reconstructed the path forward from the on-ramp rather than working backwards from the current balance. Slower, and the part that survives review."}
+    ]
+  },
+  {
+    "url": "https://www.linkedin.com/pulse/example-mica-supervision-analytics",
+    "title": "MiCA supervision is about to become a data problem, not a licensing one",
+    "author": "Ilaria Fontana",
+    "snippet": "5 days ago … Most of the market still treats MiCA as an authorisation exercise. The harder phase starts after: supervisors will want ongoing analytics, and very few CASPs have the pipeline to produce them on request …",
+    "keywords": ["MiCA compliance crypto"],
     "is_article": true,
     "relevance": 7,
-    "reason": "Substantive article in your niche; commenting positions you next to the author's audience.",
+    "reason": "Regulatory piece whose audience overlaps heavily with our compliance buyers.",
     "comments": [
-      {"style": "insight", "text": "Worth adding that several NCAs have quietly signalled they won't fast-track applications filed in the final quarter — the practical deadline is months earlier than the legal one."},
-      {"style": "question", "text": "Are you seeing CASPs choose their filing jurisdiction based on supervisory capacity rather than substance requirements?"}
+      {"style": "insight", "text": "The shift changes what compliance teams need to keep: authorisation rewards a point-in-time file, ongoing supervision rewards a reproducible pipeline. Those imply different tooling and usually different staff."},
+      {"style": "question", "text": "Do you expect supervisors to converge on a common analytics format, or is the realistic near-term outcome that each national authority asks for something slightly different?"},
+      {"style": "experience", "text": "The firms least anxious about this are the ones that already had to answer an investigative request under time pressure. Doing it once exposes whether the underlying data is actually queryable."}
     ]
   },
   {
-    "url": "https://www.linkedin.com/posts/example-recruiter_fintech-hiring-activity-71599",
-    "title": "We're hiring! Compliance Officer (fintech) — Ljubljana or remote",
-    "author": "TalentBridge Recruiting",
-    "snippet": "1 day ago … We're hiring! Our client, a fast-growing fintech, is looking for a Compliance Officer. Requirements: 3+ years …",
-    "keywords": ["fintech regulation"],
+    "url": "https://www.linkedin.com/posts/example-nis2-reporting-activity-71005",
+    "title": "The 24-hour NIS2 notification is not the hard part",
+    "author": "Bojan Kralj",
+    "snippet": "3 days ago … Everyone is drilling the initial notification. The pain arrives at the one-month final report, when you are asked what actually happened and the forensic work was never scoped to answer that …",
+    "keywords": ["NIS2 incident reporting obligations", "ransomware incident response Europe"],
     "is_article": false,
-    "relevance": 2,
-    "reason": "Job ad — no discussion value for your audience.",
+    "relevance": 8,
+    "reason": "CISO-level post on the seam between incident response and regulatory reporting.",
+    "comments": [
+      {"style": "insight", "text": "Scoping forensic work to the eventual report rather than to containment is what makes the one-month deadline survivable. Containment answers whether it stopped; the report asks what happened, and only one of those is evidenced by default."},
+      {"style": "question", "text": "Are you seeing organisations pull the reporting obligation into the IR retainer itself, or does it still land on legal after the fact?"},
+      {"style": "experience", "text": "The final report is usually where teams discover which logs rotated on day three. Setting retention against the reporting deadline rather than the investigation is a cheap fix, made far too late."}
+    ]
+  },
+  {
+    "url": "https://www.linkedin.com/posts/example-recovery-ad-activity-71006",
+    "title": "LOST YOUR CRYPTO? Our certified experts recover funds FAST — 98% success rate",
+    "author": "SwiftChain Asset Recovery",
+    "snippet": "1 day ago … Do not give up hope! Our specialists have recovered millions for victims worldwide. Free consultation, no recovery no fee. DM us your wallet details to get started …",
+    "keywords": ["crypto fraud investigation law enforcement"],
+    "is_article": false,
+    "relevance": 1,
+    "reason": "A recovery-scam advertisement — the category we define ourselves against, and asking for wallet details is the tell.",
     "comments": []
   },
   {
-    "url": "https://www.linkedin.com/posts/example-conference_fintech-event-activity-71610",
-    "title": "Only 3 days left to register for FinReg Summit 2026!",
-    "author": "FinReg Summit",
-    "snippet": "6 hours ago … Only 3 days left to register! Join 400+ compliance professionals in Vienna …",
-    "keywords": ["fintech regulation", "MiCA crypto licensing"],
+    "url": "https://www.linkedin.com/posts/example-victim-post-activity-71007",
+    "title": "Izgubil sem prihranke na lažni trgovalni platformi in ne vem, kam se obrniti",
+    "author": "Anonymous",
+    "snippet": "6 days ago … Osem mesecev sem nakazoval sredstva na platformo, za katero sem verjel, da je regulirana. Januarja so se izplačila ustavila. Prijavo sem oddal, a odgovora ni …",
+    "keywords": ["kriptovalute prevara"],
     "is_article": false,
-    "relevance": 4,
-    "reason": "Event promo — low discussion value, but the audience overlap is real.",
-    "comments": [
-      {"style": "question", "text": "Which panel are you most looking forward to? The supervisory roundtable looks like the one where the real news will drop."}
-    ]
-  },
-  {
-    "url": "https://www.linkedin.com/posts/example-tine-k_psd3-open-banking-activity-71633",
-    "title": "PSD3 will quietly kill screen scraping — and most banks are not ready for the API load",
-    "author": "Tine Krajnc",
-    "snippet": "4 days ago … PSD3 will quietly kill screen scraping. Everyone celebrates, but nobody talks about what happens when the fallback disappears and API traffic triples …",
-    "keywords": ["fintech regulation"],
-    "is_article": false,
-    "relevance": null,
-    "reason": null,
+    "relevance": 2,
+    "reason": "A distressed individual describing their own loss — commenting reads as ambulance-chasing and is explicitly out of scope.",
     "comments": []
   }
 ]
