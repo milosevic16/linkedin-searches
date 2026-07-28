@@ -1,8 +1,13 @@
 # LinkedIn Comment Radar
 
-A self-refreshing dashboard that puts **LinkedIn posts worth commenting on** in
-front of you every morning, with Claude-written comment ideas ready to adapt — so
-building visibility takes minutes instead of an hour of scrolling.
+A dashboard that puts **LinkedIn posts worth commenting on** in front of you,
+with Claude-written comment ideas ready to adapt — so building visibility takes
+minutes instead of an hour of scrolling.
+
+**It refreshes when you ask it to, not on a schedule.** Searching costs real API
+credit (about EUR 1.20 a time), so there is a **Refresh posts** button at the top
+of the dashboard and nothing runs until you press it. The live LinkedIn search
+links on the page are fresh every time you open them regardless — those are free.
 
 The page is organised **by topic**. Each topic gets one section containing both
 of the things you need, because no single source does both jobs:
@@ -59,7 +64,10 @@ so a rebuild only redoes the stage whose inputs actually changed:
 | `keywords`, `notable_days`, `searches_per_keyword` | a full search | full run |
 
 So you can iterate on comment tone as often as you like without paying to search
-LinkedIn again each time. The daily scheduled run always does a full gather.
+LinkedIn again each time. Only pressing **Refresh posts** starts a search.
+
+If you change a keyword, the page keeps showing the previous search's posts and
+tells you to press Refresh — an edit never spends credit on its own.
 
 Each build prints a cost table to the Actions log — tokens per stage and an
 estimate in USD and EUR — and the page footer shows what that run cost.
@@ -113,7 +121,8 @@ If the secret is missing, the dashboard still deploys — it shows a friendly
 ## How the pieces fit
 
 ```
-.github/workflows/dashboard.yml   schedule + manual button → build → deploy to Pages
+.github/workflows/dashboard.yml   manual button (+ config edits) → build → Pages
+                                  no schedule: searching only happens on request
 config.yml                        keywords, profile, voice, thresholds, models
 scripts/build.py                  orchestrates; picks gather / redraft / render
 scripts/store.py                  data/latest.json + the fingerprint that decides

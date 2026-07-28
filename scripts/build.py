@@ -77,15 +77,35 @@ def main() -> int:
 
     stored = store.load()
     mode = _mode_from_argv(sys.argv)
+    no_gather = "--no-gather" in sys.argv
+    warnings: list[str] = []
+
     if mode == "auto":
         mode, reason = store.decide_mode(cfg, stored)
         print(f"Auto mode: {mode} — {reason}.")
-    elif mode in (store.REDRAFT, store.RENDER) and stored is None:
+    elif mode in (store.REDRAFT, store.RENDER) and stored is None and not no_gather:
         print(f"::warning::No stored data to {mode} from — gathering instead.")
         mode = store.GATHER
 
+    # Searching is the only step that costs real money, so it never happens
+    # as a side effect of editing config.yml — only when someone asks for it.
+    if no_gather and mode == store.GATHER:
+        if stored is None:
+            print("::warning::No stored data yet, and gathering was not requested.")
+            warnings.append(
+                "No posts have been gathered yet. Use the Refresh button above to run "
+                "the first search."
+            )
+        else:
+            print("Would gather, but --no-gather is set — rendering stored data instead.")
+            warnings.append(
+                "Your keywords or search settings changed, but searching costs money so it "
+                "does not happen automatically. The posts below are from the previous "
+                "search — use the Refresh button above to search with the new settings."
+            )
+        mode = store.RENDER
+
     usage = Usage()
-    warnings: list[str] = []
     now = datetime.now(timezone.utc).isoformat()
 
     if mode == store.GATHER:
@@ -116,11 +136,14 @@ def main() -> int:
         posts, w = enrich_posts(posts, cfg, usage=usage)
         warnings += w
 
-    else:  # RENDER
-        posts = stored.get("posts") or []
-        topics = stored.get("topics") or []
-        warnings += stored.get("warnings") or []
-        gathered_at = stored.get("generated_at") or now
+    else:  # RENDER — stored may be absent if nothing has been gathered yet
+        posts = (stored or {}).get("posts") or []
+        topics = (stored or {}).get("topics") or []
+        warnings += (stored or {}).get("warnings") or []
+        gathered_at = (stored or {}).get("generated_at") or now
+        if not topics:  # nothing gathered yet — the links still work, and are free
+            topics, w = build_launcher(cfg, with_angles=False)
+            warnings += w
         print(f"Rendering {len(posts)} stored posts — no API calls.")
 
     # Render first so the is_new flags it sets get persisted, but save in a

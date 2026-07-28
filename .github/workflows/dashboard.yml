@@ -1,16 +1,12 @@
 name: Build dashboard
 
+# There is deliberately NO schedule. Searching costs real money, so it only
+# happens when someone asks for it — via the "Refresh posts" button on the
+# dashboard, which links here. To go back to automatic refreshes, add:
+#   schedule:
+#     - cron: "30 5 * * 1,3,5"     # 07:30 Ljubljana, Mon/Wed/Fri
 on:
-  schedule:
-    # 05:30 UTC = 07:30 Ljubljana (summer) / 06:30 (winter), Mon/Wed/Fri.
-    # Three gathers a week rather than five: a gather costs real money, and
-    # the posts it finds are already weeks old, so a day's delay changes
-    # nothing. The live LinkedIn search links on the page are fresh whenever
-    # you open them, independently of this schedule.
-    # Edit the cron line to change when the dashboard refreshes.
-    - cron: "30 5 * * 1,3,5"
-
-  workflow_dispatch:      # "Run workflow" button in the Actions tab
+  workflow_dispatch:      # "Run workflow" button — what the page links to
     inputs:
       mode:
         description: "What to run"
@@ -53,19 +49,18 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      # Searching costs money; rendering does not. A scheduled run is the one
-      # that should genuinely go and look for new posts. A push is usually
-      # someone editing config.yml, so let build.py work out the cheapest
-      # sufficient mode from what actually changed.
+      # A push is someone editing config.yml, not a request to spend money, so
+      # it gets --no-gather: it will re-render or re-draft from stored posts,
+      # but never start a search. If the edit changed the keywords, the page
+      # says so and asks you to press Refresh. Searching happens only when the
+      # run was asked for by hand.
       - name: Choose build mode
         id: mode
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "flag=--gather" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "flag=--${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
           else
-            echo "flag=--auto" >> "$GITHUB_OUTPUT"
+            echo "flag=--auto --no-gather" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build dashboard

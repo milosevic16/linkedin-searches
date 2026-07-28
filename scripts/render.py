@@ -237,14 +237,26 @@ def render(
 
     now = datetime.now(_TZ)
     generated = now.strftime("%A, %d %b %Y · %H:%M")
-    gathered_label = ""
+    repo = os.environ.get("GITHUB_REPOSITORY", "milosevic16/linkedin-searches")
+
+    # Now that refreshing is manual, how old the posts are is the single most
+    # useful thing on the page — it is what tells you whether to spend on a
+    # refresh. Always show it, in plain language.
+    freshness = "Posts have never been gathered"
     if gathered_at:
         try:
             when = datetime.fromisoformat(gathered_at).astimezone(_TZ)
-            if (now - when).total_seconds() > 3600:
-                gathered_label = f" · posts last gathered {when.strftime('%d %b, %H:%M')}"
+            hours = (now - when).total_seconds() / 3600
+            stamp = when.strftime("%d %b, %H:%M")
+            if hours < 1:
+                freshness = f"Posts gathered just now ({stamp})"
+            elif hours < 24:
+                freshness = f"Posts gathered {int(hours)}h ago ({stamp})"
+            else:
+                days = int(hours // 24)
+                freshness = f"Posts gathered {days} day{'s' if days != 1 else ''} ago ({stamp})"
         except ValueError:
-            pass
+            freshness = "Posts gathered at an unknown time"
 
     min_rel = int(cfg.get("min_relevance", 5))
     n_new = sum(1 for p in posts if p.get("is_new"))
@@ -288,6 +300,32 @@ def render(
       <div class="stat"><span class="stat-n">{n_new}</span><span class="stat-l">new since last run</span></div>
     </div>"""
 
+    # The page is static HTML on GitHub Pages, so this cannot POST to the
+    # Actions API directly — that needs a token, and a token embedded in a
+    # public page would let anyone spend the API budget. So it links to the
+    # workflow page, where the run is two clicks away and authenticated as you.
+    refresh_html = f"""<section class="refresh">
+      <div class="refresh-text">
+        <strong>Posts are only searched for when you ask.</strong>
+        <span>Refreshing runs the searches again and rewrites every draft.
+        Takes about 7 minutes and costs roughly EUR 1.20 of API credit.</span>
+      </div>
+      <a class="refresh-btn" href="https://github.com/{_esc(repo)}/actions/workflows/dashboard.yml"
+         target="_blank" rel="noopener">Refresh posts&nbsp;↗</a>
+    </section>
+    <details class="refresh-how">
+      <summary>How to refresh</summary>
+      <ol>
+        <li>Click <strong>Refresh posts</strong> above (you need to be signed in to GitHub).</li>
+        <li>On that page, click the <strong>Run workflow</strong> dropdown on the right.</li>
+        <li>Leave the mode on <strong>gather</strong> and click the green <strong>Run workflow</strong> button.</li>
+        <li>Wait a few minutes, then reload this page.</li>
+      </ol>
+      <p>The other modes are cheaper: <strong>redraft</strong> rewrites the comments for the posts
+      already found (use it after editing your voice in config.yml), and <strong>render</strong>
+      just rebuilds this page for free.</p>
+    </details>"""
+
     cost_note = ""
     if usage and usage.get("usd"):
         cost_note = (
@@ -297,8 +335,6 @@ def render(
         )
     elif usage is not None and not usage.get("usd"):
         cost_note = "This page was rebuilt from stored data — no API calls, no cost.<br>"
-
-    repo = os.environ.get("GITHUB_REPOSITORY", "milosevic16/linkedin-searches")
 
     page = f"""<!doctype html>
 <html lang="en">
@@ -337,6 +373,20 @@ header h1 {{ font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }}
   padding: 8px 14px; display: flex; flex-direction: column; min-width: 92px; box-shadow: var(--shadow); }}
 .stat-n {{ font-size: 20px; font-weight: 650; }}
 .stat-l {{ font-size: 12px; color: var(--ink-2); }}
+.freshness {{ margin: -12px 0 18px; font-size: 13px; font-weight: 600; color: var(--ink-2); }}
+.refresh {{ display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; box-shadow: var(--shadow); }}
+.refresh-text {{ flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 2px; }}
+.refresh-text strong {{ font-size: 14px; }}
+.refresh-text span {{ font-size: 12.5px; color: var(--ink-2); }}
+.refresh-btn {{ flex: none; background: var(--accent); color: var(--accent-ink); text-decoration: none;
+  border-radius: 8px; padding: 10px 18px; font-size: 14px; font-weight: 650; white-space: nowrap; }}
+.refresh-how {{ margin: 0 0 18px; }}
+.refresh-how summary {{ cursor: pointer; color: var(--ink-2); font-size: 12.5px; padding-left: 2px; }}
+.refresh-how ol {{ font-size: 13px; color: var(--ink-2); margin: 8px 0; padding-left: 20px; }}
+.refresh-how li {{ margin-bottom: 3px; }}
+.refresh-how p {{ font-size: 12.5px; color: var(--ink-3); margin: 6px 0 0; }}
 .topicnav {{ display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px;
   padding-bottom: 14px; border-bottom: 1px solid var(--line); }}
 .navchip {{ font-size: 12.5px; color: var(--ink-2); text-decoration: none;
@@ -407,9 +457,11 @@ code {{ background: var(--low-bg); border-radius: 5px; padding: 1px 5px; font-si
 <div class="wrap">
   <header>
     <h1>LinkedIn Comment Radar</h1>
-    <p class="sub">Your LinkedIn commenting shortlist · updated {_esc(generated)}{_esc(gathered_label)}</p>
+    <p class="sub">Your LinkedIn commenting shortlist · page built {_esc(generated)}</p>
+    <p class="freshness">{_esc(freshness)}</p>
   </header>
   {stats}
+  {refresh_html}
   {warn_html}
   {body_main}
   <footer>{cost_note}Adapt every draft before posting — identical comments from two accounts read as bots.<br>

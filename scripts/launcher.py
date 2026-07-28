@@ -88,7 +88,7 @@ def search_url(keyword: str, window: str = "past-24h", newest_first: bool = True
     return SEARCH_BASE + "?" + "&".join(params)
 
 
-def build_launcher(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
+def build_launcher(cfg: dict, usage=None, with_angles: bool = True) -> tuple[list[dict], list[str]]:
     """Return (topics, warnings). Each topic: keyword, fresh_url, week_url, angles."""
     warnings: list[str] = []
     keywords = [str(k).strip() for k in (cfg.get("keywords") or []) if str(k).strip()]
@@ -111,7 +111,9 @@ def build_launcher(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
         for k in keywords
     ]
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    # The links themselves are just URLs — free, and the useful half of this
+    # section. Only the angles cost anything, so they can be skipped.
+    if not with_angles or not os.environ.get("ANTHROPIC_API_KEY"):
         return topics, warnings
 
     import anthropic
