@@ -30,9 +30,9 @@ voice: |
   praise like "Great post!". Write in the same language as the post.
 
 search:
-  days_back: 3            # only posts Google indexed in the last N days
-  pages_per_keyword: 2    # 10 results per page, per keyword
-  include_articles: true  # also match linkedin.com/pulse articles
+  days_back: 3               # aim for posts from the last N days
+  searches_per_keyword: 2    # web searches per keyword (cost: ~$0.01 each)
+  include_articles: true     # also match linkedin.com/pulse articles
 
 # Posts scoring below this (0–10) are tucked into a collapsed section.
 min_relevance: 5

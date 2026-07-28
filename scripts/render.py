@@ -109,14 +109,13 @@ def _card(post: dict) -> str:
 def _setup_section() -> str:
     return """<section class="notice setup">
       <h2>Almost there — one-time setup needed</h2>
-      <p>The dashboard ran, but its API keys are not configured yet. An admin needs to add
-      three <strong>repository secrets</strong> (Settings → Secrets and variables → Actions):</p>
+      <p>The dashboard ran, but its API key is not configured yet. An admin needs to add one
+      <strong>repository secret</strong> (Settings → Secrets and variables → Actions):</p>
       <ol>
-        <li><code>GOOGLE_API_KEY</code> — Google Custom Search JSON API key</li>
-        <li><code>GOOGLE_CSE_ID</code> — Programmable Search Engine ID (restricted to linkedin.com)</li>
-        <li><code>ANTHROPIC_API_KEY</code> — for relevance scores and comment drafts</li>
+        <li><code>ANTHROPIC_API_KEY</code> — finds the posts, scores them, and drafts the comments</li>
       </ol>
-      <p>Full instructions are in the repository README. Once the secrets are in place, the next
+      <p>Get one at <a href="https://console.anthropic.com/">console.anthropic.com</a> → API keys.
+      Full instructions are in the repository README. Once the secret is in place, the next
       scheduled run fills this page with posts.</p>
     </section>"""
 

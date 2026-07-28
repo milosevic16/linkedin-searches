@@ -1,7 +1,7 @@
 """Build the dashboard end-to-end: search → enrich → render.
 
 Usage:
-  python scripts/build.py            # real run (needs env keys)
+  python scripts/build.py            # real run (needs ANTHROPIC_API_KEY)
   python scripts/build.py --sample   # offline preview with bundled sample data
 """
 
@@ -18,7 +18,7 @@ import yaml
 
 from enrich import enrich_posts
 from render import render
-from search_google import search_posts
+from search_claude import search_posts
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -37,9 +37,8 @@ def main() -> int:
         print(f"Sample dashboard written to {ROOT / 'site' / 'index.html'}")
         return 0
 
-    configured = bool(os.environ.get("GOOGLE_API_KEY") and os.environ.get("GOOGLE_CSE_ID"))
-    if not configured:
-        print("::warning::GOOGLE_API_KEY / GOOGLE_CSE_ID not set — rendering setup page.")
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("::warning::ANTHROPIC_API_KEY not set — rendering setup page.")
         render([], cfg, warnings=[], configured=False)
         return 0
 

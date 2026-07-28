@@ -5,9 +5,9 @@ commenting on**, scores them for relevance with Claude, and drafts 2–3 comment
 ideas per post — so building LinkedIn visibility takes minutes, not an hour of
 scrolling.
 
-**How it works:** every weekday morning a GitHub Action searches Google's index
-of public LinkedIn posts for your keywords → Claude scores each post and drafts
-comments in your voice → the results are published as a simple web page.
+**How it works:** every weekday morning a GitHub Action asks Claude to search the
+web for public LinkedIn posts matching your keywords → Claude scores each post and
+drafts comments in your voice → the results are published as a simple web page.
 
 There is nothing to install. Commenting itself stays manual and human: you open
 the post on LinkedIn (logged in as yourself) and paste/adapt a draft.
@@ -35,37 +35,37 @@ dashboard rebuilds itself in ~2 minutes. No coding involved.
 
 ## One-time setup (owner)
 
-The tool needs three secrets. Total cost at this scale: **$0 for search** (free
-tier) and **a few cents per day** for Claude.
+The tool needs **one secret**: an Anthropic API key. It does the searching, the
+scoring, and the comment drafting.
 
-### 1. Google Programmable Search Engine (finds the posts)
+### 1. Get an Anthropic API key
 
-1. Go to <https://programmablesearchengine.google.com/> → **Add**.
-2. Under *"What to search"* choose **Search specific sites** and add:
-   `linkedin.com/posts/*` and `linkedin.com/pulse/*`
-3. Create it, then copy the **Search engine ID** → this is `GOOGLE_CSE_ID`.
-4. Get an API key at
-   <https://developers.google.com/custom-search/v1/overview> → **Get a key**
-   → this is `GOOGLE_API_KEY`. Free tier: 100 searches/day (this tool uses
-   ~2 per keyword per run).
+1. Go to <https://console.anthropic.com/> and sign in (or create an account).
+2. Add a payment method under **Billing** — usage is pay-as-you-go.
+3. Go to **API keys → Create key**, name it something like `linkedin-radar`,
+   and copy the value. It starts with `sk-ant-`. **Copy it now — the console
+   will not show it again.**
 
-### 2. Anthropic API key (scores posts + drafts comments)
+**Expected cost: roughly $3–5 per month.** Web searches are billed at $10 per
+1,000, and this tool runs about 10 per weekday; the scoring and drafting tokens
+add ~$1. You can cap spending in the console under **Billing → Limits**.
 
-Create a key at <https://console.anthropic.com/> → API keys → this is
-`ANTHROPIC_API_KEY`. Usage here is tiny (short snippets in, short drafts out).
+### 2. Wire it up on GitHub
 
-### 3. Wire it up on GitHub
-
-1. Repo **Settings → Secrets and variables → Actions → New repository secret**,
-   add all three: `GOOGLE_API_KEY`, `GOOGLE_CSE_ID`, `ANTHROPIC_API_KEY`.
+1. Repo **Settings → Secrets and variables → Actions → New repository secret**.
+   Name it exactly `ANTHROPIC_API_KEY`, paste the key, save.
 2. Repo **Settings → Pages** → under *Build and deployment* set **Source:
    GitHub Actions** (the first workflow run usually enables this by itself).
-3. Make sure this code is on the **`main` branch** — scheduled workflows only
-   run from the default branch.
-4. Trigger the first run: Actions tab → **Build dashboard** → *Run workflow*.
+3. Trigger the first run: Actions tab → **Build dashboard** → *Run workflow*.
+   It takes 1–3 minutes.
 
-If a secret is missing, the dashboard still deploys — it shows a friendly
+If the secret is missing, the dashboard still deploys — it shows a friendly
 "setup needed" page instead of failing silently.
+
+> **Why not Google?** Google closed its free Custom Search JSON API to new
+> customers in January 2026 and shuts it down entirely on 1 January 2027, so it
+> is not an option for a new project. Claude's built-in web search replaces it
+> and needs no second account.
 
 > **Note on privacy:** the repo and the dashboard URL are public. Anyone with
 > the link can see your keywords and the drafted comments. Fine for most
@@ -82,25 +82,29 @@ If a secret is missing, the dashboard still deploys — it shows a friendly
 ```
 .github/workflows/dashboard.yml   schedule + manual button → build → deploy to Pages
 config.yml                        keywords, profile, voice, thresholds
-scripts/search_google.py          Google CSE → recent linkedin.com/posts results
+scripts/search_claude.py          Claude web_search tool (allowed_domains:
+                                  linkedin.com) → recent post URLs + snippets
 scripts/enrich.py                 Claude (claude-opus-5, structured outputs):
                                   relevance 0–10 + reason + 2–3 comment drafts
 scripts/render.py                 static HTML dashboard + data.json (remembers
                                   previously-shown URLs → NEW badges)
 ```
 
-- **Freshness / dedupe:** searches cover the last `days_back` days; the previous
+- **No hallucinated links:** URLs come from the search tool's own result blocks,
+  not from Claude's prose. Anything the model mentions that the search did not
+  actually return is discarded before it can reach the dashboard.
+- **Freshness / dedupe:** searches target the last `days_back` days; the previous
   deploy's `data.json` is fetched so already-shown posts lose their NEW badge.
-- **Coverage caveat:** Google indexes many but not all public LinkedIn posts,
-  with a delay of hours to days. Treat the dashboard as a strong daily shortlist,
-  not an exhaustive feed.
-- **Failure behavior:** quota hits, API errors, and skipped steps surface as a
-  yellow warning box on the dashboard itself.
+- **Coverage caveat:** search engines index many but not all public LinkedIn
+  posts, with a delay of hours to days. Treat the dashboard as a strong daily
+  shortlist, not an exhaustive feed.
+- **Failure behavior:** rate limits, API errors, and skipped steps surface as a
+  yellow warning box on the dashboard itself rather than an empty page.
 
 ## Local development
 
 ```bash
 pip install -r requirements.txt
-python scripts/build.py --sample     # offline preview → site/index.html
-GOOGLE_API_KEY=… GOOGLE_CSE_ID=… ANTHROPIC_API_KEY=… python scripts/build.py
+python scripts/build.py --sample        # offline preview, no API key needed
+ANTHROPIC_API_KEY=… python scripts/build.py
 ```
