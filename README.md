@@ -153,9 +153,17 @@ scripts/render.py                 static HTML dashboard + data.json (remembers
   rules and returns a filtered list; the raw result set (full of 2021–2023 posts)
   is used solely as a URL whitelist. If it finds nothing suitable it returns an
   empty list and the section says so, rather than padding with stale posts.
-- **Dynamic filtering is deliberately off** (`allowed_callers: ["direct"]`). By
-  default this tool version filters results inside code execution before Claude
-  sees them, which would silently drop candidate posts.
+- **Dynamic filtering is on.** The search tool prunes results inside code
+  execution before they reach the context window. It was switched off at first,
+  to be sure no candidate post was dropped before the model could judge it —
+  but measuring a real run showed that choice was pushing roughly 50,000 tokens
+  of raw results per keyword and accounted for 88% of the bill. The tradeoff
+  now runs the other way: a marginal post may be filtered out unseen.
+- **The URL whitelist survives either setting.** Harvesting walks the response
+  tree for `web_search_result` blocks rather than assuming they sit at the top
+  level, because with filtering on they may not. If a keyword's results are
+  described but none match a harvested URL, the run warns instead of silently
+  rendering an empty topic.
 - **Dedupe:** the previous deploy's `data.json` is fetched over HTTPS, so posts
   already shown on an earlier run lose their NEW badge.
 - **Two windows, two settings:** `fresh_window` controls the LinkedIn links at the

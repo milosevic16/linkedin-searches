@@ -77,6 +77,27 @@ def _is_post_url(url: str, include_articles: bool) -> bool:
     return include_articles and "/pulse/" in url
 
 
+def _iter_search_results(node, depth: int = 0):
+    """Yield every web_search_result in a response, wherever it sits.
+
+    With dynamic filtering on, the search runs inside code execution, so the
+    result blocks are not reliably top-level any more. Walking the tree keeps
+    the URL whitelist working under either shape — and that whitelist is the
+    only thing stopping an invented URL reaching the dashboard, so it must not
+    quietly depend on the response's layout.
+    """
+    if node is None or depth > 6 or isinstance(node, (str, bytes, int, float, bool)):
+        return
+    if isinstance(node, list):
+        for item in node:
+            yield from _iter_search_results(item, depth + 1)
+        return
+    if getattr(node, "type", "") == "web_search_result":
+        yield node
+        return
+    yield from _iter_search_results(getattr(node, "content", None), depth + 1)
+
+
 def _extract_json_array(text: str):
     """Pull a JSON array out of the model's reply, tolerating stray prose/fences."""
     if not text:
@@ -138,12 +159,12 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
                 "name": "web_search",
                 "max_uses": n_searches + 2,  # headroom for query refinement
                 "allowed_domains": ["linkedin.com"],
-                # Bypass "dynamic filtering". By default this tool version runs
-                # search inside code execution, which prunes results before they
-                # reach the model — good for research questions, wrong for us:
-                # we want every raw result so no candidate post is silently
-                # dropped, and direct calls keep the result blocks top-level.
-                "allowed_callers": ["direct"],
+                # Dynamic filtering is left ON. It prunes results inside code
+                # execution before they reach the context window, and measuring
+                # a real run showed why that matters: with it off, each keyword
+                # pushed roughly 50,000 tokens of raw results through, which was
+                # 88% of the run's cost. The tradeoff is that a marginal post can
+                # be filtered out before the model judges it.
             }
         ]
 
@@ -171,27 +192,26 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
                 )
                 if usage is not None:
                     usage.record("search", model, response)
-                # Harvest the authoritative URLs from the tool's own results.
+                # Surface tool errors: on failure `content` is an error object
+                # rather than a list of results.
                 for block in response.content:
-                    if getattr(block, "type", "") != "web_search_tool_result":
-                        continue
-                    results = block.content
-                    if not isinstance(results, list):  # error object, not results
-                        code = getattr(results, "error_code", "unknown")
-                        warnings.append(f"Web search error for “{keyword}”: {code}")
-                        continue
-                    for r in results:
-                        if getattr(r, "type", "") != "web_search_result":
-                            continue
-                        url = _normalize(getattr(r, "url", ""))
-                        if url and _is_post_url(url, include_articles):
-                            found_urls.setdefault(
-                                url,
-                                {
-                                    "title": (getattr(r, "title", "") or "").strip(),
-                                    "page_age": getattr(r, "page_age", None),
-                                },
-                            )
+                    if getattr(block, "type", "") == "web_search_tool_result":
+                        results = block.content
+                        if not isinstance(results, list):
+                            code = getattr(results, "error_code", "unknown")
+                            warnings.append(f"Web search error for “{keyword}”: {code}")
+
+                # Harvest the authoritative URLs from the tool's own results.
+                for r in _iter_search_results(response.content):
+                    url = _normalize(getattr(r, "url", ""))
+                    if url and _is_post_url(url, include_articles):
+                        found_urls.setdefault(
+                            url,
+                            {
+                                "title": (getattr(r, "title", "") or "").strip(),
+                                "page_age": getattr(r, "page_age", None),
+                            },
+                        )
 
                 if response.stop_reason != "pause_turn":
                     break
@@ -215,13 +235,25 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
             continue
 
         text = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
-        described = {}
+        described, claimed = {}, 0
         for item in _extract_json_array(text):
             if not isinstance(item, dict):
                 continue
+            claimed += 1
             url = _normalize(str(item.get("url", "")))
             if url in found_urls:  # ← the guard: must be a real search result
                 described[url] = item
+
+        # The whitelist is a safety net, not a filter that should routinely
+        # fire. If the model described posts and none of them matched a
+        # harvested URL, the harvesting broke rather than the model lying —
+        # say so, instead of rendering an empty topic and looking fine.
+        if claimed and not described:
+            warnings.append(
+                f"Search for “{keyword}” described {claimed} post(s) but none matched a "
+                f"verified search result — dropped. If this affects every keyword, URL "
+                f"harvesting is broken, not the model."
+            )
 
         # Only posts Claude vouched for. It has read the results and applied the
         # recency/quality rules; the raw result set is full of years-old posts,
