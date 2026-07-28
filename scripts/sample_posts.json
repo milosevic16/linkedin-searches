@@ -1,0 +1,80 @@
+[
+  {
+    "url": "https://www.linkedin.com/posts/example-anna-kovac_fintech-regulation-eu-activity-71234",
+    "title": "The new EBA guidelines on outsourcing will hit smaller EMIs harder than anyone admits…",
+    "author": "Anna Kovač",
+    "snippet": "3 days ago … The new EBA guidelines on outsourcing will hit smaller EMIs harder than anyone admits. Compliance teams of two people cannot run a full vendor register, and yet …",
+    "keywords": ["fintech regulation"],
+    "is_article": false,
+    "relevance": 9,
+    "reason": "A compliance leader inviting discussion on exactly the pain point your clients have.",
+    "comments": [
+      {"style": "insight", "text": "We see the same pattern with our EMI clients — the register itself isn't the burden, the annual re-assessment cycle is. A lightweight criticality tiering usually cuts the workload by half without weakening the audit trail."},
+      {"style": "question", "text": "Do you expect national regulators to apply proportionality here in practice, or will the guidelines be enforced uniformly regardless of team size?"},
+      {"style": "experience", "text": "When we helped a two-person compliance team through this last year, the surprise wasn't the volume of vendors — it was how many 'non-critical' tools turned out to touch client data."}
+    ]
+  },
+  {
+    "url": "https://www.linkedin.com/posts/example-marko-b_digitalbanking-slovenia-activity-71422",
+    "title": "Slovenija je dobila novo digitalno banko — ampak ali jo sploh potrebujemo?",
+    "author": "Marko Breznik",
+    "snippet": "2 days ago … Slovenija je dobila novo digitalno banko. Ampak ali jo sploh potrebujemo? Poglejmo številke: 87 % Slovencev že uporablja mobilno banko …",
+    "keywords": ["digital banking Slovenia"],
+    "is_article": false,
+    "relevance": 8,
+    "reason": "Local, high-engagement debate squarely in your market — good visibility opportunity.",
+    "comments": [
+      {"style": "insight", "text": "Odlična analiza. Ampak številka, ki manjka: koliko od teh 87 % uporablja mobilno banko za kaj več kot vpogled v stanje? Prava priložnost za izzivalce ni v aplikaciji, ampak v produktih, ki jih tradicionalne banke ne ponujajo."},
+      {"style": "question", "text": "Kaj misliš, da je večja ovira za novo banko pri nas — regulatorni stroški ali navade uporabnikov?"}
+    ]
+  },
+  {
+    "url": "https://www.linkedin.com/pulse/mica-transition-period-what-casps-need-know-example-jelena",
+    "title": "MiCA transition period: what CASPs need to know before December",
+    "author": "Jelena Novak",
+    "snippet": "5 days ago … With the MiCA transition period closing, crypto-asset service providers face a choice: file now under the national regime or wait …",
+    "keywords": ["MiCA crypto licensing"],
+    "is_article": true,
+    "relevance": 7,
+    "reason": "Substantive article in your niche; commenting positions you next to the author's audience.",
+    "comments": [
+      {"style": "insight", "text": "Worth adding that several NCAs have quietly signalled they won't fast-track applications filed in the final quarter — the practical deadline is months earlier than the legal one."},
+      {"style": "question", "text": "Are you seeing CASPs choose their filing jurisdiction based on supervisory capacity rather than substance requirements?"}
+    ]
+  },
+  {
+    "url": "https://www.linkedin.com/posts/example-recruiter_fintech-hiring-activity-71599",
+    "title": "We're hiring! Compliance Officer (fintech) — Ljubljana or remote",
+    "author": "TalentBridge Recruiting",
+    "snippet": "1 day ago … We're hiring! Our client, a fast-growing fintech, is looking for a Compliance Officer. Requirements: 3+ years …",
+    "keywords": ["fintech regulation"],
+    "is_article": false,
+    "relevance": 2,
+    "reason": "Job ad — no discussion value for your audience.",
+    "comments": []
+  },
+  {
+    "url": "https://www.linkedin.com/posts/example-conference_fintech-event-activity-71610",
+    "title": "Only 3 days left to register for FinReg Summit 2026!",
+    "author": "FinReg Summit",
+    "snippet": "6 hours ago … Only 3 days left to register! Join 400+ compliance professionals in Vienna …",
+    "keywords": ["fintech regulation", "MiCA crypto licensing"],
+    "is_article": false,
+    "relevance": 4,
+    "reason": "Event promo — low discussion value, but the audience overlap is real.",
+    "comments": [
+      {"style": "question", "text": "Which panel are you most looking forward to? The supervisory roundtable looks like the one where the real news will drop."}
+    ]
+  },
+  {
+    "url": "https://www.linkedin.com/posts/example-tine-k_psd3-open-banking-activity-71633",
+    "title": "PSD3 will quietly kill screen scraping — and most banks are not ready for the API load",
+    "author": "Tine Krajnc",
+    "snippet": "4 days ago … PSD3 will quietly kill screen scraping. Everyone celebrates, but nobody talks about what happens when the fallback disappears and API traffic triples …",
+    "keywords": ["fintech regulation"],
+    "is_article": false,
+    "relevance": null,
+    "reason": null,
+    "comments": []
+  }
+]
