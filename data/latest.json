@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-07-28T20:51:27.686524+00:00",
+ "generated_at": "2026-07-28T21:42:04.937772+00:00",
  "fingerprint": {
-  "search": "47a68f2c9cbb5606",
-  "draft": "36cc9d5ea10a45ce"
+  "search": "9e7ff84ce31fdc17",
+  "draft": "3b743daeea7d00bc"
  },
  "topics": [
   {
@@ -10,597 +10,97 @@
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20asset%20tracing%20litigation&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20asset%20tracing%20litigation&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Tracing is not recovery",
-     "text": "Worth separating two things that get merged in most discussions: tracing establishes where value moved, recovery depends on a custodian holding it and a legal order they will act on. A perfect graph that ends at a self-hosted wallet in a non-cooperative jurisdiction is evidence, not leverage."
-    },
-    {
-     "label": "Speed before layering",
-     "text": "The practical window is measured in hours to days, not weeks: once funds pass through a swap service or bridge and are split across chains, the work shifts from a straight trace to attribution and clustering, which costs more and proves less. Preservation requests to the receiving exchange usually matter more early than a polished report."
-    },
-    {
-     "label": "Court-ready versus screenshots",
-     "text": "Explorer screenshots rarely survive challenge; what holds up is a documented methodology, stated heuristic assumptions, confidence levels and a named person who can be cross-examined on them. Ask any provider whether their output states what it cannot prove."
-    }
-   ]
+   "angles": []
   },
   {
    "keyword": "hidden crypto assets divorce",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=hidden%20crypto%20assets%20divorce&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=hidden%20crypto%20assets%20divorce&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Start from fiat rails",
-     "text": "Undisclosed crypto is usually found through bank and card statements to exchanges, tax filings and device artefacts rather than by staring at the chain first. Once you have one confirmed deposit address, on-chain work can extend it, but the entry point is almost always documentary."
-    },
-    {
-     "label": "Disclosure orders beat guesswork",
-     "text": "An exchange will not answer a spouse's lawyer, but it will answer a properly framed court order or regulator route, and the request needs to specify account identifiers and date ranges to be actionable. Vague requests for \"all crypto holdings\" tend to come back empty."
-    },
-    {
-     "label": "Valuation date problem",
-     "text": "A sharp question in these matters is which valuation date applies, because a portfolio can move 40% between filing and hearing, and staking or LP positions may not be liquid on the date chosen. Worth agreeing the methodology early rather than litigating it later."
-    }
-   ]
+   "angles": []
   },
   {
    "keyword": "crypto source of funds verification",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20source%20of%20funds%20verification&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20source%20of%20funds%20verification&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Risk score is not provenance",
-     "text": "An automated risk score tells you the address is not on a sanctions list; it does not tell you where the money came from. Source of funds means a reconstructed history linking the assets to a documented economic event, and screening tools were never designed to do that."
-    },
-    {
-     "label": "The 2017 wallet problem",
-     "text": "The hardest files are legitimate: early mining, an exchange that no longer exists, no records. That is a documentation and reconstruction exercise, and rejecting the client outright is often a compliance decision dressed as a risk one."
-    },
-    {
-     "label": "Ask what the bank will accept",
-     "text": "Before commissioning any analysis, worth asking the receiving institution what evidential standard they will actually accept, because a 60-page chain report is useless if their policy requires a fiat-side audit trail. Aligning that up front saves weeks."
-    }
-   ]
+   "angles": []
   },
   {
    "keyword": "MiCA compliance crypto",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=MiCA%20compliance%20crypto&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=MiCA%20compliance%20crypto&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Supervision needs analytics",
-     "text": "MiCA obligations land as text but are supervised as data, and many CASPs still cannot evidence on-chain monitoring of their own flows to a competent authority in a reproducible way. The gap tends to appear at the first thematic review, not at authorisation."
-    },
-    {
-     "label": "Travel Rule friction is real",
-     "text": "The operational pain is not the rule but counterparty verification: self-hosted wallet attestation and unequal implementation across member states mean transfers get held for reasons customers do not understand. Worth publishing your handling policy rather than absorbing the complaints."
-    },
-    {
-     "label": "Authorisation is the easy part",
-     "text": "Getting licensed is a project with an end date; staying supervised is a permanent evidencing function with staffing implications. Firms that resource only the first tend to discover the second during an inspection."
-    }
-   ]
+   "angles": []
   },
   {
    "keyword": "AML crypto exchange compliance",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=AML%20crypto%20exchange%20compliance&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=AML%20crypto%20exchange%20compliance&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Choke points do the work",
-     "text": "Almost every actual freeze happens at a centralised exchange, so the value of monitoring is in flagging inbound deposits fast enough for a hold to be meaningful, not in perfect retrospective typology reports. Alert-to-action time is the metric worth measuring."
-    },
-    {
-     "label": "False positives as a risk",
-     "text": "Over-flagging looks safe but degrades the queue until real alerts sit unreviewed for days, which is exactly the delay that lets funds move on. Tuning thresholds is a risk decision, not a cost-saving one."
-    },
-    {
-     "label": "SAR quality over volume",
-     "text": "FIUs act on reports that name addresses, timestamps, counterparty exchanges and a clear narrative; volume without that is noise everyone pays for. Ask your FIU what their triage actually looks like, the answers are usually blunt and useful."
-    }
-   ]
+   "angles": []
   },
   {
    "keyword": "ransomware incident response Europe",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=ransomware%20incident%20response%20Europe&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=ransomware%20incident%20response%20Europe&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Payment is a legal question",
-     "text": "Whether to pay is decided by sanctions exposure, insurance terms and regulatory reporting duties before it is decided by technical restoration options. Getting counsel and the reporting clock into the room in hour one changes the shape of the whole incident."
-    },
-    {
-     "label": "Trace the wallet anyway",
-     "text": "Even where no payment is made, the ransom address is intelligence: clustering it against known affiliate infrastructure often tells you which group you are dealing with and how they behave on negotiation and re-extortion. That informs decisions the forensic image cannot."
-    },
-    {
-     "label": "Comms failure costs more",
-     "text": "Most of the reputational damage we see comes from the second and third statements contradicting the first, because technical facts changed while communications did not have a channel to them. Assign one person who sits across both."
-    }
-   ]
+   "angles": []
   },
   {
    "keyword": "NIS2 incident reporting obligations",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=NIS2%20incident%20reporting%20obligations&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=NIS2%20incident%20reporting%20obligations&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "The 24-hour clock reality",
-     "text": "The early warning is not an incident report; it is a short notification that something significant may be underway, and teams that wait for certainty miss the window. Draft the template before you need it and decide now who is authorised to send it at 3am."
-    },
-    {
-     "label": "Significance is a judgement call",
-     "text": "The hard part is not the deadline but deciding what counts as significant when the impact assessment is still moving. Write down the criteria in advance so the decision is defensible later rather than reconstructed under pressure."
-    },
-    {
-     "label": "Supply chain reporting gaps",
-     "text": "Many entities discover during an incident that their provider contracts contain no obligation to notify them fast enough to meet their own deadline. That is a procurement fix, not an incident response one."
-    }
-   ]
+   "angles": []
   },
   {
    "keyword": "DORA operational resilience finance",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=DORA%20operational%20resilience%20finance&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=DORA%20operational%20resilience%20finance&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Register of information bites",
-     "text": "The contractual register is where most firms find out how many third parties they actually depend on, and the data quality problem is bigger than the policy problem. It is a data engineering exercise with a compliance label."
-    },
-    {
-     "label": "Testing must be able to fail",
-     "text": "Resilience testing only has value if the scenario is allowed to produce an uncomfortable result and that result reaches the board unedited. Exercises designed to be passed generate paperwork, not resilience."
-    },
-    {
-     "label": "Crypto exposure sits inside DORA",
-     "text": "For institutions with crypto exposure, the ICT dependency often includes custody providers and chain infrastructure that never appear in the traditional vendor list. Worth checking whether your register captures them."
-    }
-   ]
+   "angles": []
   },
   {
    "keyword": "blockchain forensics investigation",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=blockchain%20forensics%20investigation&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=blockchain%20forensics%20investigation&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Heuristics have error rates",
-     "text": "Common-input-ownership and change-address heuristics are useful and probabilistic, and any report that presents clustering as certainty is overstating. Stating the assumption and its failure modes is what makes the analysis defensible."
-    },
-    {
-     "label": "Attribution is off-chain",
-     "text": "The chain shows movement; identity comes from exchange KYC, subpoenas, OSINT and device data. Investigations stall when teams expect the analytics tool to produce a name it structurally cannot produce."
-    },
-    {
-     "label": "Mixers are not the end",
-     "text": "Passing through a mixer or privacy pool reduces confidence but rarely ends the trail, since timing, amount correlation and downstream deposit behaviour still yield leads. The honest framing is lower confidence, not zero."
-    }
-   ]
+   "angles": []
   },
   {
    "keyword": "crypto fraud investigation law enforcement",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20fraud%20investigation%20law%20enforcement&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20fraud%20investigation%20law%20enforcement&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "First report quality decides",
-     "text": "Whether a case progresses often depends on what the victim's first statement contains: transaction hashes, timestamps, platform names and preserved communications. Investigators triage on completeness, and most reports arrive without any of it."
-    },
-    {
-     "label": "MLAT versus the clock",
-     "text": "Formal mutual legal assistance takes months while funds move in minutes, which is why informal exchange-to-police preservation channels and 24/7 contact points matter more than the eventual paperwork. Building those relationships before a case is the actual capability."
-    },
-    {
-     "label": "Recovery fraud second wave",
-     "text": "A predictable pattern is the second approach offering to recover the first loss, often referencing real case numbers. Investigators and banks seeing repeat victims should treat any upfront-fee recovery offer as a fresh offence rather than a follow-up."
-    }
-   ]
+   "angles": []
   },
   {
    "keyword": "kriptovalute prevara",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=kriptovalute%20prevara&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
    "week_url": "https://www.linkedin.com/search/results/content/?keywords=kriptovalute%20prevara&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Hitrost pred plastenjem",
-     "text": "Pri teh primerih odloča čas: dokler sredstva ostanejo na naslovu centralizirane borze, obstaja postopkovna pot, po prehodu čez menjalnike in mostove pa se delo prevesi v pripisovanje identitete in dokazovanje. Prijava in zahteva za zavarovanje podatkov v prvih urah pomenita bistveno več kot obsežno poročilo čez mesec dni."
-    },
-    {
-     "label": "Sledenje ni vračilo",
-     "text": "Sledenje pokaže, kam je vrednost odtekla, vračilo pa je odvisno od tega, ali sredstva hrani nekdo, ki se odzove na pravni akt. Ti dve stvari se v javni razpravi pogosto zamenjujeta in ustvarjata nerealna pričakovanja."
-    },
-    {
-     "label": "Drugi val goljufij",
-     "text": "Po prvi izgubi skoraj vedno sledi ponudba za \"povrnitev sredstev\" proti predplačilu, kar je nova goljufija nad istim oškodovancem. Nihče, ki dela zakonito, ne zahteva zasebnih ključev ali seed fraze in nihče ne more jamčiti izida."
-    }
-   ]
+   "angles": []
   }
  ],
- "posts": [
-  {
-   "url": "https://www.linkedin.com/posts/ken-palla-09b585_more-scam-control-innovation-here-is-an-activity-7442728178604969984-We_6",
-   "title": "TRM Labs Enhances Crypto Tracing with AI",
-   "author": "Ken Palla",
-   "snippet": "Post highlighting TRM Labs' new AI-powered tools for enhancing crypto tracing capabilities as part of scam control innovation efforts.",
-   "keywords": [
-    "crypto asset tracing litigation"
-   ],
-   "is_article": false,
-   "page_age": null,
-   "relevance": 6,
-   "reason": "Tracing tech post with a compliance audience, good place to add the tracing-vs-evidence distinction.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "AI clustering helps triage volume, but the bottleneck in practice is rarely attribution speed — it is whether the output survives as evidence: documented methodology, reproducible hop-by-hop trail, and a named choke point where a centralised exchange can actually act."
-    },
-    {
-     "style": "question",
-     "text": "Do these tools expose the confidence level behind each attribution? For court-ready work we have to be able to say which parts are on-chain fact and which are heuristic inference."
-    },
-    {
-     "style": "experience",
-     "text": "In our casework the value of automation shows up early: identifying the exchange deposit address within days, before funds are layered through bridges and swaps, is worth more than any later analytical elegance."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/posts/kasjank_bitcoin-blockchain-tether-activity-7392104744699187200-GG74",
-   "title": "$26M Frozen on Blockchain—With One Click",
-   "author": "Kasjan",
-   "snippet": "Post describing how $26 million in crypto assets tied to fraud was frozen on the blockchain, referencing Bitcoin, Tether, and blockchain-based asset freezing tools used in litigation contexts.",
-   "keywords": [
-    "crypto asset tracing litigation"
-   ],
-   "is_article": false,
-   "page_age": null,
-   "relevance": 7,
-   "reason": "Freezing and litigation is core to our work and attracts lawyers and compliance readers.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "Worth separating the two mechanisms: issuer-level freezes on tokens like USDT are contractual and can be near-instant, while BTC has no such switch — there the only lever is a centralised exchange choke point plus a legal order."
-    },
-    {
-     "style": "question",
-     "text": "Was the freeze triggered on issuer request or on the back of a court order? The distinction matters a lot for how fast a victim's counsel should move and where."
-    },
-    {
-     "style": "experience",
-     "text": "Freezing is the easy half. Getting frozen value released to the rightful claimant usually takes a civil claim and cooperation from the exchange or issuer, and that timeline is months, not clicks."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/posts/jbhorwitz_administrative-monetary-penalty-on-xeltox-activity-7386773566870097921-cZaQ",
-   "title": "FINTRAC fines crypto exchange $176M for AML violations",
-   "author": "jbhorwitz",
-   "snippet": "Post discusses FINTRAC issuing an administrative monetary penalty against crypto exchange Xeltox for anti-money laundering compliance failures. Highlights the scale of the fine as a signal of tightening AML enforcement on crypto exchanges.",
-   "keywords": [
-    "AML crypto exchange compliance"
-   ],
-   "is_article": false,
-   "page_age": null,
-   "relevance": 7,
-   "reason": "AML enforcement news read by exactly our compliance audience.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "The size of the penalty matters less than the finding pattern: unregistered operation plus missing large-value and suspicious transaction reporting is what turns a technical gap into an enforcement case."
-    },
-    {
-     "style": "question",
-     "text": "Are you seeing regulators lean more on transaction-monitoring quality than on formal registration now, or is registration still the first tripwire?"
-    },
-    {
-     "style": "experience",
-     "text": "In source-of-funds reviews we routinely see exchange records that cannot reconstruct the on-chain origin of a deposit — that reconstruction gap is usually where AML programmes fail an examination."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/posts/diligencify_india-targets-25-crypto-exchanges-over-aml-activity-7379676309226049537-mghR",
-   "title": "India Targets 25 Crypto Exchanges for AML Non-Compliance",
-   "author": "Diligencify",
-   "snippet": "Post covers Indian regulators taking action against 25 crypto exchanges over anti-money laundering non-compliance. Frames this as part of a broader regulatory crackdown on VASPs in India.",
-   "keywords": [
-    "AML crypto exchange compliance"
-   ],
-   "is_article": false,
-   "page_age": null,
-   "relevance": 6,
-   "reason": "Relevant VASP AML news, moderate discussion value.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "Enforcement against local VASPs tends to push flows to offshore venues and peer-to-peer, which shifts the burden onto tracing across jurisdictions rather than reducing the underlying activity."
-    },
-    {
-     "style": "question",
-     "text": "Is the action focused on registration failures or on substantive monitoring and reporting deficiencies? The remediation path is very different."
-    },
-    {
-     "style": "experience",
-     "text": "When exchanges in one jurisdiction tighten, we see the same illicit clusters reappear within weeks on venues with slower response times — which is precisely where freeze requests stall."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/posts/jessica-cath_fincrime-compliance-aml-activity-7407703967389986816-fBiT",
-   "title": "Financial Crime Roundup: Fines, Crypto Regime & ...",
-   "author": "Jessica Cath",
-   "snippet": "A financial crime roundup post summarizing recent AML fines and updates to the crypto regulatory regime. Tagged with #fincrime #compliance #aml, aimed at compliance professionals tracking enforcement trends.",
-   "keywords": [
-    "AML crypto exchange compliance"
-   ],
-   "is_article": false,
-   "page_age": null,
-   "relevance": 5,
-   "reason": "Roundup format invites less discussion but the audience is right.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "One pattern across the recent crypto fines: the failure is rarely the absence of a policy, it is the inability to evidence that the policy was applied to a specific transaction on a specific date."
-    },
-    {
-     "style": "question",
-     "text": "Which of the recent regime changes do you expect to bite hardest in practice — the reporting obligations or the supervisory expectations on transfer traceability?"
-    },
-    {
-     "style": "experience",
-     "text": "These roundups are useful precisely because enforcement themes travel; the deficiencies cited in one jurisdiction show up in our source-of-funds reviews elsewhere a year later."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/posts/frankieone_crypto-kyc-and-aml-compliance-how-btc-markets-activity-7447128548005515264-xyVD",
-   "title": "Crypto Exchanges Need Compliance Infrastructure Not ...",
-   "author": "FrankieOne",
-   "snippet": "Post argues crypto exchanges like BTC Markets need robust KYC and AML compliance infrastructure rather than ad hoc solutions. Discusses practical implications for exchanges building out compliance programs.",
-   "keywords": [
-    "AML crypto exchange compliance"
-   ],
-   "is_article": false,
-   "page_age": null,
-   "relevance": 6,
-   "reason": "Compliance infrastructure debate, right buyers, though poster is a vendor.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "Agreed on infrastructure over ad hoc fixes, with one addition: KYC and on-chain analytics have to be joined up, because the hard questions are about the origin of a deposit, not the identity of the depositor."
-    },
-    {
-     "style": "question",
-     "text": "How do you handle the source-of-funds cases that automated screening cannot resolve — the deposits that are clean by score but come through bridges or mixers?"
-    },
-    {
-     "style": "experience",
-     "text": "The reviews we get asked to do are almost always the residual cases screening flags but cannot explain; a programme without a defined escalation path for those creates a backlog that shows up in the next examination."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/posts/beth-george_incident-response-forum-ransomware-2025-activity-7398812379544940544-TnmL",
-   "title": "Incident Response Forum Ransomware 2025",
-   "author": "Beth George",
-   "snippet": "A post promoting/discussing an Incident Response Forum focused on ransomware in 2025, aimed at practitioners handling ransomware incident response.",
-   "keywords": [
-    "ransomware incident response Europe"
-   ],
-   "is_article": false,
-   "page_age": null,
-   "relevance": 5,
-   "reason": "Event promo, but the ransomware IR audience is a target group.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "The part of ransomware response that is still routinely under-resourced is the payment and tracing track: if a transfer happens, the on-chain trail has to be documented in the first hours, alongside the regulatory notification clock."
-    },
-    {
-     "style": "question",
-     "text": "Will the agenda cover the interaction between incident notification deadlines and sanctions screening of a potential payment? Those two workstreams collide constantly."
-    },
-    {
-     "style": "experience",
-     "text": "In the incidents we support, the decisions that later prove hardest to defend are made in the first 24 hours — usually because legal, forensics and communications were not in the same room."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/posts/jponnoly1_european-cyber-report-2025-activity-7313389901326995458-UyYH",
-   "title": "European Cyber Report 2025",
-   "author": "Dr. Joseph Ponnoly, DBA",
-   "snippet": "Cybersecurity is a business-critical priority. Below is the European cyber report 2025 from Link11 headquartered in Frankfurt, Germany. Indicates evolving threat landscape, Denial of service attacks and ransomware taking the lead, with fast, targeted, multi-vector and high bandwidth attacks.",
-   "keywords": [
-    "ransomware incident response Europe"
-   ],
-   "is_article": false,
-   "page_age": "April 3, 2025",
-   "relevance": 5,
-   "reason": "Threat-landscape report post reaching CISOs, modest discussion depth.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "Worth pairing the attack-volume data with response data: under NIS2 the reporting clock starts on awareness, so detection quality now shapes regulatory exposure as much as technical impact does."
-    },
-    {
-     "style": "question",
-     "text": "Does the report separate DDoS used as pure disruption from DDoS used as pressure alongside an extortion demand? The response playbooks are quite different."
-    },
-    {
-     "style": "experience",
-     "text": "What we see in extortion cases matches the multi-vector trend: pressure is applied on several fronts at once, and organisations that rehearsed only the encryption scenario end up improvising the rest."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/posts/vistainfosec_nis2-nis2compliance-cybersecurity-activity-7442450641052147713-3qpz",
-   "title": "NIS2 Incident Reporting Deadlines: Compliance and ...",
-   "author": "VISTA InfoSec",
-   "snippet": "A post discussing the NIS2 incident reporting deadlines, covering compliance requirements and what organizations need to know under the directive.",
-   "keywords": [
-    "NIS2 incident reporting obligations"
-   ],
-   "is_article": false,
-   "page_age": null,
-   "relevance": 6,
-   "reason": "Relevant NIS2 compliance topic reaching CISO/DPO audience, though vendor content with thin discussion value.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "The 24-hour early warning is rarely the hard part; the hard part is having enough forensic signal within those 24 hours to say whether the incident is significant at all. In ransomware cases that usually means preserved logs and wallet-level indicators captured before systems are rebuilt."
-    },
-    {
-     "style": "question",
-     "text": "How are you seeing organisations handle the case where the 72-hour notification and an ongoing criminal investigation pull in opposite directions on what can be disclosed?"
-    },
-    {
-     "style": "experience",
-     "text": "In incidents we have worked, the reporting clock is usually lost in the first hours to internal escalation, not to technical analysis. A named decision-maker with authority to notify, plus a pre-agreed template, removes most of that delay."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/posts/vistainfosec_nis2-nis2compliance-cybersecurity-activity-7442438856601387010-40Wn",
-   "title": "NIS2 Incident Reporting Deadlines: What You Need to Know",
-   "author": "VISTA InfoSec",
-   "snippet": "A post outlining key NIS2 incident reporting deadlines and compliance obligations that organizations need to be aware of.",
-   "keywords": [
-    "NIS2 incident reporting obligations"
-   ],
-   "is_article": false,
-   "page_age": null,
-   "relevance": 5,
-   "reason": "Duplicate vendor post on NIS2 deadlines with limited discussion, but the audience fits.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "One detail worth adding: the initial notification does not need to be complete, and treating it as if it does is what causes late filings. An early warning with clear unknowns beats a polished report submitted after the deadline."
-    },
-    {
-     "style": "question",
-     "text": "Do you see entities documenting the reasoning behind a decision not to report? In our experience that written assessment matters as much to a supervisor as the notifications themselves."
-    },
-    {
-     "style": "experience",
-     "text": "Where a payment demand is involved, the reporting timeline and the forensic timeline collide immediately, since tracing is most productive in the first days before funds are layered through swaps and bridges. Planning both tracks in the same playbook helps."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/pulse/meeting-new-cyber-incident-reporting-deadlines-under-nis2-adewole-dtige",
-   "title": "Meeting New Cyber Incident Reporting Deadlines Under the NIS2 Directive",
-   "author": "Adewole",
-   "snippet": "The article explains NIS2's tightened incident reporting requirements, including the 24-hour early warning and 72-hour full notification deadlines, and criteria for what counts as a 'significant' incident. It also discusses challenges for SMEs with limited resources and offers guidance on preparing detection, analysis, and notification procedures.",
-   "keywords": [
-    "NIS2 incident reporting obligations"
-   ],
-   "is_article": true,
-   "page_age": "November 7, 2023",
-   "relevance": 7,
-   "reason": "Substantive NIS2 analysis inviting discussion, and the SME resourcing angle gives us something concrete to add.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "The SME point is the real one. Detection and notification procedures can be documented cheaply, but the classification decision on what counts as significant needs someone with authority available out of hours, otherwise the 24-hour window is spent looking for that person."
-    },
-    {
-     "style": "question",
-     "text": "For extortion incidents, do you treat the criminal complaint and the NIS2 notification as one workflow or two? They have different audiences and different evidentiary expectations, and mixing them tends to weaken both."
-    },
-    {
-     "style": "experience",
-     "text": "We often see logs rotated or endpoints reimaged before anyone considers the 72-hour full notification, which leaves the report thin on impact and attribution. Preservation instructions in the first hour cost nothing and shape everything that follows."
-    }
-   ],
-   "is_new": true
-  },
-  {
-   "url": "https://www.linkedin.com/posts/chainalysis_blockchain-crypto-taxcompliance-activity-7343595155678994432-n25Q",
-   "title": "\"Public Key Episode 166: Crypto Tax Compliance\"",
-   "author": "Chainalysis",
-   "snippet": "Chainalysis announced a new episode of its Public Key podcast featuring Global Head of Capacity Building Jim Lee and Richard Las CBE from HM Revenue & Customs discussing intelligence-led investigations transforming tax fraud detection in crypto in the UK. The episode covers HMRC's approach to crypto tax compliance, public-private partnerships in financial crime prevention, and international cooperation strategies.",
-   "keywords": [
-    "blockchain forensics investigation"
-   ],
-   "is_article": false,
-   "page_age": "June 25, 2025",
-   "relevance": 7,
-   "reason": "Credible forensics topic with tax authority and public-private angle, good visibility to our public sector and compliance audience.",
-   "comments": [
-    {
-     "style": "insight",
-     "text": "Intelligence-led work on crypto tax cases usually turns on source-of-funds reconstruction rather than on the on-chain trail alone: the chain shows movement, but the exchange records and fiat off-ramps are what make a position defensible in front of an authority."
-    },
-    {
-     "style": "question",
-     "text": "Curious whether HMRC's approach leans on taxpayer-provided transaction histories or on independent reconstruction, because the two diverge sharply once DeFi and bridging are involved."
-    },
-    {
-     "style": "experience",
-     "text": "In source-of-funds work we find the recurring gap is not the tracing but the documentation of self-transfers, which taxpayers routinely report as disposals or omit entirely. Clear guidance on evidencing wallet ownership would resolve a surprising share of disputes."
-    }
-   ],
-   "is_new": true
-  }
+ "posts": [],
+ "warnings": [
+  "Could not prepare comment angles (BadRequestError) — links still work.",
+  "Apify results carry no recognisable URL field (saw: author, commentIds, comments, content, contentAttributes, engagement, entityId, header, id, linkedinUrl, postImages, postedAt, query, reactionIds, reactions, shareLinkedinUrl, shareUrn, socialContent, type). The actor's output format has probably changed — scripts/search_apify.py needs its field names updated.",
+  "Apify returned 2204 posts but none survived filtering (2204 with no verifiable date). Widen notable_max_age_hours if this keeps happening."
  ],
- "warnings": [],
  "usage": {
-  "usd": 1.2542,
-  "eur": 1.1539,
-  "calls": 14,
-  "searches": 32,
-  "steps": {
-   "angles": {
-    "model": "claude-opus-5",
-    "calls": 1,
-    "input": 2199,
-    "output": 3491,
-    "cache_read": 0,
-    "cache_write": 0,
-    "searches": 0,
-    "usd": 0.0983
-   },
-   "search": {
-    "model": "claude-sonnet-5",
-    "calls": 11,
-    "input": 65,
-    "output": 11765,
-    "cache_read": 264863,
-    "cache_write": 125841,
-    "searches": 32,
-    "usd": 1.048
-   },
-   "draft": {
-    "model": "claude-opus-5",
-    "calls": 2,
-    "input": 1874,
-    "output": 3320,
-    "cache_read": 2302,
-    "cache_write": 2302,
-    "searches": 0,
-    "usd": 0.1079
+  "usd": 4.408,
+  "eur": 4.0554,
+  "calls": 0,
+  "searches": 0,
+  "external": {
+   "apify": {
+    "units": 2204,
+    "unit_label": "posts",
+    "usd": 4.408
    }
-  }
+  },
+  "steps": {}
  }
 }
