@@ -70,8 +70,11 @@ jobs:
         run: python scripts/build.py ${{ steps.mode.outputs.flag }}
 
       # Persist the gathered posts so later rebuilds can skip the searching.
+      # This runs on branches too: a gather is expensive enough that throwing
+      # its results away just because it ran off main means paying twice to
+      # get the same data onto main. Branch pushes don't trigger this workflow,
+      # so committing here cannot loop.
       - name: Store gathered data
-        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

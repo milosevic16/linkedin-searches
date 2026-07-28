@@ -119,26 +119,50 @@ class Usage:
         if not self.steps:
             return "No Claude calls were made this run — nothing to bill."
 
-        head = f"{'step':<10}{'model':<18}{'calls':>6}{'in':>9}{'cached':>9}{'out':>8}{'srch':>6}{'USD':>9}"
+        head = (
+            f"{'step':<10}{'model':<18}{'calls':>6}{'in':>9}{'cache wr':>10}"
+            f"{'cache rd':>10}{'out':>8}{'srch':>6}{'USD':>9}"
+        )
         lines = [head, "-" * len(head)]
         for name, s in self.steps.items():
             lines.append(
-                f"{name:<10}{s.model:<18}{s.calls:>6}{s.input:>9,}"
-                f"{s.cache_read:>9,}{s.output:>8,}{s.searches:>6}{s.usd:>9.4f}"
+                f"{name:<10}{s.model:<18}{s.calls:>6}{s.input:>9,}{s.cache_write:>10,}"
+                f"{s.cache_read:>10,}{s.output:>8,}{s.searches:>6}{s.usd:>9.4f}"
             )
         lines.append("-" * len(head))
         lines.append(
             f"{'TOTAL':<10}{'':<18}{sum(s.calls for s in self.steps.values()):>6}"
-            f"{'':>9}{'':>9}{'':>8}{sum(s.searches for s in self.steps.values()):>6}"
+            f"{'':>9}{'':>10}{'':>10}{'':>8}{sum(s.searches for s in self.steps.values()):>6}"
             f"{self.total_usd:>9.4f}"
         )
         lines.append(f"≈ EUR {self.total_eur:.4f} at {_USD_TO_EUR} EUR/USD (list prices, no discounts)")
-        if any(s.cache_read for s in self.steps.values()):
-            saved = sum(
-                s.cache_read * _PRICES.get(s.model, _FALLBACK_PRICE)[0] / 1_000_000 * (1 - _CACHE_READ_MULT)
-                for s in self.steps.values()
-            )
-            lines.append(f"Prompt caching saved about USD {saved:.4f} this run.")
-        else:
-            lines.append("No cache reads this run — if that persists, caching is not working.")
+        lines.append(self._cache_verdict())
         return "\n".join(lines)
+
+    def _cache_verdict(self) -> str:
+        """Whether caching actually paid for itself.
+
+        Reads are cheap but writes carry a premium, so caching only wins if
+        enough of what gets written is read back. Reporting the read discount
+        alone (which this used to do) overstates the benefit — badly, when
+        each call caches a fresh prefix that later calls never reuse.
+        """
+        if not any(s.cache_read or s.cache_write for s in self.steps.values()):
+            return "No caching activity this run — if that persists, caching is not working."
+
+        saved = 0.0
+        for s in self.steps.values():
+            price_in = _PRICES.get(s.model, _FALLBACK_PRICE)[0] / 1_000_000
+            would_have_cost = (s.cache_read + s.cache_write) * price_in
+            actually_cost = (
+                s.cache_read * price_in * _CACHE_READ_MULT
+                + s.cache_write * price_in * _CACHE_WRITE_MULT
+            )
+            saved += would_have_cost - actually_cost
+
+        if saved >= 0:
+            return f"Prompt caching was worth USD {saved:.4f} this run (net of the write premium)."
+        return (
+            f"Prompt caching COST USD {-saved:.4f} this run — more was written to the cache "
+            f"than got read back. Worth reviewing where the breakpoints sit."
+        )
