@@ -173,7 +173,7 @@ max_enriched: 150
 # because the page is public and anyone could read it out. Leave empty and
 # the button falls back to linking at the GitHub Actions page.
 # Setup instructions: worker/README.md
-refresh_endpoint: ""
+refresh_endpoint: "https://linkedin-refresh.privat-milosevic.workers.dev"
 
 # ── Models ────────────────────────────────────────────────────────────
 # Reusable comment angles per topic. Not a hard task, so: cheapest.
