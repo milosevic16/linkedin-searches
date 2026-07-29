@@ -147,6 +147,9 @@ def _work(company, mode: str, no_gather: bool, usage: Usage, now: str) -> tuple:
     gathered_at, mode) — mode is returned because it can be downgraded."""
     stored = store.load(company)
     warnings: list[str] = []
+    # Cleared if the run fails to produce posts for the current settings, so
+    # the fingerprint is not stamped as satisfied and --auto tries again.
+    config_applied = True
 
     if mode == "auto":
         mode, reason = store.decide_mode(company.cfg, stored)
@@ -226,6 +229,7 @@ def _work(company, mode: str, no_gather: bool, usage: Usage, now: str) -> tuple:
                 print(f"::warning::Search failed: {exc}")
                 posts = (stored or {}).get("posts") or []
                 gathered_at = (stored or {}).get("generated_at") or now
+                config_applied = False
                 warnings.append(
                     f"Could not fetch posts ({exc}) "
                     + (f"— showing the {len(posts)} from the previous search."
@@ -270,7 +274,7 @@ def _work(company, mode: str, no_gather: bool, usage: Usage, now: str) -> tuple:
         print(f"Post search is off — hiding {len(posts)} previously gathered posts.")
         posts = []
 
-    return posts, topics, warnings, gathered_at, mode, stored
+    return posts, topics, warnings, gathered_at, mode, stored, config_applied
 
 
 def main() -> int:
@@ -320,7 +324,9 @@ def main() -> int:
     now = datetime.now(timezone.utc).isoformat()
 
     print(f"── {target.name} ({target.slug}) ──")
-    posts, topics, warnings, gathered_at, mode, stored = _work(target, mode, no_gather, usage, now)
+    posts, topics, warnings, gathered_at, mode, stored, config_applied = _work(
+        target, mode, no_gather, usage, now
+    )
 
     # Render first so the is_new flags it sets get persisted, but save in a
     # finally: a rendering bug must not throw away searches we already paid
@@ -356,6 +362,7 @@ def main() -> int:
                 warnings=warnings,
                 usage=merged,
                 generated_at=gathered_at,
+                config_applied=config_applied,
             )
             print(f"Stored run data in {target.data_path.relative_to(ROOT)}")
 

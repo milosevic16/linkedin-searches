@@ -82,14 +82,22 @@ def fingerprint(cfg: dict) -> dict:
 
 
 def save(company, *, topics: list[dict], posts: list[dict], warnings: list[str],
-         usage: dict | None, generated_at: str) -> None:
+         usage: dict | None, generated_at: str, config_applied: bool = True) -> None:
+    """Persist a run's result.
+
+    config_applied=False records that this run did NOT successfully produce
+    posts for the current settings — a search that failed, say. The fingerprint
+    is left empty so the next --auto tries again. Stamping it as current would
+    tell every later run that there was nothing to do, which is how a single
+    failed search could bury a company's posts for good.
+    """
     path = company.data_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(
             {
                 "generated_at": generated_at,
-                "fingerprint": fingerprint(company.cfg),
+                "fingerprint": fingerprint(company.cfg) if config_applied else {},
                 "topics": topics,
                 "posts": posts,
                 "warnings": warnings,
@@ -112,8 +120,22 @@ def _read_json(path: Path):
 
 
 def load(company) -> dict | None:
-    data = _read_json(company.data_path)
-    return data if isinstance(data, dict) else None
+    path = company.data_path
+    data = _read_json(path)
+    if isinstance(data, dict):
+        return data
+    if path.exists():
+        # Unreadable, but it is the only copy of work that was paid for. Move
+        # it aside rather than letting the next save write straight over it —
+        # returning None here means the caller sees "never gathered", and
+        # without this that mistake would be permanent.
+        salvage = path.with_suffix(".json.corrupt")
+        try:
+            path.replace(salvage)
+            print(f"::error::{path.name} could not be read. Kept a copy at {salvage.name}.")
+        except OSError:
+            print(f"::error::{path.name} could not be read, and could not be moved aside.")
+    return None
 
 
 def load_seen(company) -> list[str] | None:
