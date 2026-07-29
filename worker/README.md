@@ -77,10 +77,15 @@ and the Refresh button becomes a password box.
 
 - **Only ever starts this one workflow.** It cannot read the repository, change
   code, or run anything else, because the token has no other permission.
-- **Refuses a refresh within 10 minutes of the last one**, and refuses while one
-  is already running. Each refresh costs money at two vendors, and the password
-  is shared and simple by design — assume it gets around. This is what stops
-  someone holding down the button and draining the month's credit.
+- **Bounds what it can cost.** Refuses within 10 minutes of the last refresh,
+  refuses while one is running, and refuses past **3 a day** or **12 in 30
+  days**. Each refresh costs money at two vendors and the password is shared by
+  design, so assume it gets around — the cooldown alone would still allow 144 a
+  day. To change the limits, edit the constants at the top of the worker.
+- **Fails closed.** If GitHub cannot be read, the refresh is refused rather than
+  allowed. Otherwise a transient GitHub error would silently switch off every
+  limit above, which is the wrong direction to fail in when the failure spends
+  money.
 - **Answers every request at the same speed**, and compares the password in
   constant time, so neither timing nor response speed hints at a partial match.
 - **Never returns the token or the password**, in any response or error.
@@ -94,6 +99,8 @@ The page shows the reason under the button.
 | *Wrong password* | Mistyped, or `REFRESH_PASSWORD` changed |
 | *A refresh is already running* | Wait for it — reload in a few minutes |
 | *Refreshed N min ago* | The 10-minute cooldown |
+| *That is N refreshes in 24 hours / 30 days* | The daily or monthly cap — raise the constants in the worker if the budget allows |
+| *Could not check recent refreshes* | GitHub was unreadable, so it refused rather than risk an uncapped run. Try again shortly |
 | *GitHub refused the request (401/403)* | Token expired or its permissions were reduced — redo step 1 |
 | *Could not reach the refresh service* | Worker not deployed, or `refresh_endpoint` is wrong |
 
