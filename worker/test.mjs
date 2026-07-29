@@ -31,6 +31,12 @@ const dispatchRun = (minsAgo, status = "completed") => ({
   created_at: iso(minsAgo),
 });
 
+const pushRun = (minsAgo, status = "completed") => ({
+  event: "push",
+  status,
+  created_at: new Date(Date.now() - minsAgo * 60000).toISOString(),
+});
+
 function post(body, headers = {}) {
   return new Request("https://w.dev/", {
     method: "POST",
@@ -63,14 +69,19 @@ await check("GitHub 500 on runs read -> refuse, no dispatch",
 await check("no runs at all -> dispatch allowed",
   post({ password: "bloctopus" }), ENV, ok([]), 202, 1);
 
-// --- daily cap ---
-const threeToday = Array.from({ length: 3 }, (_, i) => dispatchRun(30 + i * 60));
-await check("3 dispatch runs in 24h -> daily cap refuses",
-  post({ password: "bloctopus" }), ENV, ok(threeToday), 429, 0);
+// --- daily cap --- (read from the worker, so raising a cap does not
+// silently turn its own test into a no-op)
+const src = await import("node:fs").then((fs) => fs.readFileSync("./refresh-worker.js", "utf8"));
+const CAP_DAY = Number(src.match(/MAX_REFRESHES_PER_DAY = (\d+)/)[1]);
+const CAP_MONTH = Number(src.match(/MAX_REFRESHES_PER_30_DAYS = (\d+)/)[1]);
 
-const twoToday = Array.from({ length: 2 }, (_, i) => dispatchRun(30 + i * 60));
-await check("2 dispatch runs in 24h -> allowed",
-  post({ password: "bloctopus" }), ENV, ok(twoToday), 202, 1);
+const atDailyCap = Array.from({ length: CAP_DAY }, (_, i) => dispatchRun(30 + i * 60));
+await check(`${CAP_DAY} dispatch runs in 24h -> daily cap refuses`,
+  post({ password: "bloctopus" }), ENV, ok(atDailyCap), 429, 0);
+
+const underDailyCap = Array.from({ length: CAP_DAY - 1 }, (_, i) => dispatchRun(30 + i * 60));
+await check(`${CAP_DAY - 1} dispatch runs in 24h -> allowed`,
+  post({ password: "bloctopus" }), ENV, ok(underDailyCap), 202, 1);
 
 // cap must ignore push-triggered (free) runs
 const pushRuns = Array.from({ length: 20 }, (_, i) => ({
@@ -137,12 +148,24 @@ results.push({
   got: String(acao), want: "https://milosevic16.github.io", msg: "",
 });
 
+// --- cooldown is paced by PAID runs only ---
+// The workflow commits its data file back to main, so every refresh is
+// followed by free push-triggered rebuilds. Pacing off the newest run of any
+// kind meant a config edit locked the button for ten minutes for no reason.
+await check("recent push run + old paid run -> allowed",
+  post({ password: "bloctopus" }), ENV,
+  ok([pushRun(1), dispatchRun(60 * 5)]), 202, 1);
+
+await check("recent push run + paid run inside cooldown -> still refused",
+  post({ password: "bloctopus" }), ENV,
+  ok([pushRun(1), dispatchRun(2)]), 429, 0);
+
 // --- 30-day cap ---
 const spread = (n, startHrs, stepHrs) => Array.from({ length: n }, (_, i) => dispatchRun(60 * (startHrs + i * stepHrs)));
-await check("12 dispatch runs in 30d (none in 24h) -> monthly cap refuses",
-  post({ password: "bloctopus" }), ENV, ok(spread(12, 30, 24)), 429, 0);
-await check("11 dispatch runs in 30d -> allowed",
-  post({ password: "bloctopus" }), ENV, ok(spread(11, 30, 24)), 202, 1);
+await check(`${CAP_MONTH} dispatch runs in 30d (none in 24h) -> monthly cap refuses`,
+  post({ password: "bloctopus" }), ENV, ok(spread(CAP_MONTH, 30, 12)), 429, 0);
+await check(`${CAP_MONTH - 1} dispatch runs in 30d -> allowed`,
+  post({ password: "bloctopus" }), ENV, ok(spread(CAP_MONTH - 1, 30, 12)), 202, 1);
 await check("12 dispatch runs older than 30d -> not counted, allowed",
   post({ password: "bloctopus" }), ENV, ok(spread(12, 24 * 31, 24)), 202, 1);
 await check("100 runs returned, all recent -> saturates, fails CLOSED",

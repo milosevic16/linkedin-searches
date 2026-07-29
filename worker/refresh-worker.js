@@ -31,8 +31,8 @@ const REF = "main";
 // caps bound them. Without the caps, someone with the password could trigger
 // 144 a day forever against a budget of roughly ten a month.
 const COOLDOWN_MINUTES = 10;
-const MAX_REFRESHES_PER_DAY = 3;
-const MAX_REFRESHES_PER_30_DAYS = 12;
+const MAX_REFRESHES_PER_DAY = 10;
+const MAX_REFRESHES_PER_30_DAYS = 30;
 
 // Deliberately slow to answer, so guessing the password is tedious. The test
 // suite sets __TEST_FAST__ to skip the wait; in Cloudflare it is undefined.
@@ -143,8 +143,8 @@ export default {
       );
     }
 
-    const run = runs[0] ?? null;
-    if (run && run.status !== "completed") {
+    const inFlight = runs[0] ?? null;
+    if (inFlight && inFlight.status !== "completed") {
       return settle(
         { ok: false, error: "A refresh is already running. Give it a few minutes." },
         409,
@@ -163,7 +163,7 @@ export default {
       return settle(
         {
           ok: false,
-          error: `That is ${spentToday} refreshes in 24 hours, which is the daily limit. Try again tomorrow.`,
+          error: `${spentToday} refreshes in the last 24 hours; the limit is ${MAX_REFRESHES_PER_DAY}. Try again later — the count drops as older ones age out.`,
         },
         429,
       );
@@ -173,14 +173,18 @@ export default {
       return settle(
         {
           ok: false,
-          error: `That is ${spentMonth} refreshes in 30 days, which is the monthly limit. It resets as older refreshes age out.`,
+          error: `${spentMonth} refreshes in the last 30 days; the limit is ${MAX_REFRESHES_PER_30_DAYS}. It frees up as older ones age out.`,
         },
         429,
       );
     }
 
-    if (run) {
-      const startedAt = Date.parse(run.created_at);
+    // Pace against the last PAID refresh, not the last run of any kind: the
+    // workflow commits its data file back to main, and those free rebuilds
+    // would otherwise lock the button for ten minutes after every config edit.
+    const lastPaid = paid[0] ?? null;
+    if (lastPaid) {
+      const startedAt = Date.parse(lastPaid.created_at);
       if (!Number.isFinite(startedAt)) {
         return settle(
           { ok: false, error: "Could not check the last refresh time. Try again in a minute." },
