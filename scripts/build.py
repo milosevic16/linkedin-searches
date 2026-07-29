@@ -91,30 +91,19 @@ def _run_sample(companies: list, endpoint: str) -> int:
     return 0
 
 
-def _stale_warning(company, stored: dict | None) -> list[str]:
-    """Tell a company's page that its settings changed and a paid Refresh is
-    needed to act on them.
+def _note_stale(company, stored: dict | None) -> None:
+    """Log that a company's settings have outrun its stored posts.
 
-    Every company gets this, not just the one a run gathered for. Without it an
-    edit to a non-gathered company's file is completely silent: the page still
-    shows the old posts and old drafts with nothing saying why.
+    Deliberately the build log only, not the page. It is true from the moment a
+    config is edited until someone pays for a Refresh, so on the page it was a
+    permanent fixture rather than news — and the header already says how old the
+    posts are, which is the part a reader actually acts on.
     """
     if stored is None:
-        return []
-    mode, _ = store.decide_mode(company.cfg, stored)
-    if mode == store.GATHER:
-        return [
-            "Your keywords or search settings changed, but searching costs money so it "
-            "does not happen automatically. The posts below are from the previous "
-            "search — use the Refresh button above to search with the new settings."
-        ]
-    if mode == store.REDRAFT:
-        return [
-            "The voice, profile or model changed, but re-writing the comments costs "
-            "money so it does not happen automatically. The drafts below were written "
-            "with the previous settings — use the Refresh button above to redo them."
-        ]
-    return []
+        return
+    mode, reason = store.decide_mode(company.cfg, stored)
+    if mode != store.RENDER:
+        print(f"{company.slug}: {reason} — press Refresh to act on it ({mode} is not free).")
 
 
 def _render_stored(company, endpoint: str, companies: list) -> None:
@@ -129,10 +118,11 @@ def _render_stored(company, endpoint: str, companies: list) -> None:
     posts = (stored or {}).get("posts") or []
     if not (company.cfg.get("search") or {}).get("find_posts", False):
         posts = []
+    _note_stale(company, stored)
     render(
         posts,
         company,
-        warnings=((stored or {}).get("warnings") or []) + _stale_warning(company, stored),
+        warnings=(stored or {}).get("warnings") or [],
         topics=topics,
         usage=(stored or {}).get("usage") or {},
         gathered_at=(stored or {}).get("generated_at"),
@@ -177,20 +167,11 @@ def _work(company, mode: str, no_gather: bool, usage: Usage, now: str) -> tuple:
                 "No posts have been gathered yet. Use the Refresh button above to run "
                 "the first search."
             )
-        elif mode == store.GATHER:
-            print("Would gather, but --no-gather is set — rendering stored data instead.")
-            warnings.append(
-                "Your keywords or search settings changed, but searching costs money so it "
-                "does not happen automatically. The posts below are from the previous "
-                "search — use the Refresh button above to search with the new settings."
-            )
-        else:
-            print("Would redraft, but --no-gather is set — rendering stored data instead.")
-            warnings.append(
-                "The voice, profile or model changed, but re-writing the comments costs "
-                "money so it does not happen automatically. The drafts below were written "
-                "with the previous settings — use the Refresh button above to redo them."
-            )
+        # Nothing to print here: the RENDER branch below calls _note_stale,
+        # which says the same thing and names the company. Log only either
+        # way — this condition holds from the moment a config is edited until
+        # someone pays for a Refresh, so on the page it was permanent furniture
+        # rather than news.
         mode = store.RENDER
 
     # A gather against template copy pays full price for posts judged against a
@@ -263,8 +244,7 @@ def _work(company, mode: str, no_gather: bool, usage: Usage, now: str) -> tuple:
         # edited keyword updates its LinkedIn link immediately. Free either way.
         topics, w = build_launcher(company.cfg)
         warnings += w
-        if not warnings:
-            warnings += _stale_warning(company, stored)
+        _note_stale(company, stored)
         print(f"Rendering {len(posts)} stored posts — no API calls.")
 
     # With post search off, previously-gathered posts must not keep rendering:
