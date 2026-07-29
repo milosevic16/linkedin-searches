@@ -27,9 +27,18 @@
 const WORKFLOW = "dashboard.yml";
 const REF = "main";
 
+// Every company with a dashboard. Must match the roster in config.yml — a
+// request naming anything else is refused before it can reach GitHub.
+const COMPANIES = ["bloctopus", "lemur"];
+
 // A refresh costs money at two vendors. The cooldown paces refreshes; the
 // caps bound them. Without the caps, someone with the password could trigger
 // 144 a day forever against a budget of roughly ten a month.
+//
+// The cooldown and the daily cap are PER COMPANY: refreshing one dashboard
+// should not lock the other's button for ten minutes. The monthly cap is
+// SHARED, because the bills are — one Apify plan, one Anthropic key. Making
+// it per-company too would look symmetrical and quietly double the ceiling.
 const COOLDOWN_MINUTES = 10;
 const MAX_REFRESHES_PER_DAY = 10;
 const MAX_REFRESHES_PER_30_DAYS = 30;
@@ -60,14 +69,39 @@ function reply(body, status, env) {
 }
 
 /** Compare in constant time, so the response cannot reveal how much of the
- *  password was right. */
+ *  password was right. An empty value never matches: two empty strings compare
+ *  equal, so without this an unset secret would accept an empty password. */
 function sameSecret(a, b) {
   const x = new TextEncoder().encode(String(a ?? ""));
   const y = new TextEncoder().encode(String(b ?? ""));
+  if (x.length === 0 || y.length === 0) return false;
   if (x.length !== y.length) return false;
   let diff = 0;
   for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
   return diff === 0;
+}
+
+/** Which company a past run spent on, read from the title the workflow sets
+ *  (`run-name:` in dashboard.yml arrives here as display_title).
+ *
+ *  Returns null when the title says nothing recognisable: a run from before
+ *  the title existed, or a workflow edit that broke the format. Callers charge
+ *  an unattributable run to EVERY company, so a title this cannot read makes
+ *  the caps stricter rather than switching them off. Attribution that fails
+ *  open is the one failure mode this must not have — it guards real money, and
+ *  nothing downstream would notice it had stopped counting. */
+function companyOf(run) {
+  const m = /company:([a-z0-9_-]+)/i.exec(String((run && run.display_title) || ""));
+  const slug = m && m[1].toLowerCase();
+  return slug && COMPANIES.includes(slug) ? slug : null;
+}
+
+/** The runs that count against `slug`: its own, plus every unattributable one. */
+function chargedTo(runs, slug) {
+  return runs.filter((r) => {
+    const owner = companyOf(r);
+    return owner === null || owner === slug;
+  });
 }
 
 async function github(env, path, init = {}) {
@@ -86,8 +120,8 @@ async function github(env, path, init = {}) {
 /** Recent runs, newest first. Throws rather than returning empty when GitHub
  *  cannot be read: every spend control below is derived from this list, so a
  *  transient GitHub error must block the refresh, not silently unlock it. */
-async function recentRuns(env) {
-  const res = await github(env, `/actions/workflows/${WORKFLOW}/runs?per_page=100`);
+async function recentRuns(env, query = "") {
+  const res = await github(env, `/actions/workflows/${WORKFLOW}/runs?per_page=100${query}`);
   if (!res.ok) throw new Error(`runs lookup failed (${res.status})`);
   const data = await res.json();
   return data.workflow_runs ?? [];
@@ -123,8 +157,13 @@ export default {
     }
 
     let password = "";
+    let company = COMPANIES[0];
     try {
-      ({ password } = await request.json());
+      const body = await request.json();
+      password = body.password;
+      // Older pages sent no company. Defaulting keeps them working rather
+      // than breaking mid-deploy while the new pages are still publishing.
+      if (body.company !== undefined && body.company !== null) company = String(body.company);
     } catch {
       return settle({ ok: false, error: "Malformed request." }, 400);
     }
@@ -133,9 +172,23 @@ export default {
       return settle({ ok: false, error: "Wrong password." }, 401);
     }
 
-    let runs;
+    company = company.trim().toLowerCase();
+    if (!COMPANIES.includes(company)) {
+      return settle({ ok: false, error: "Unknown company." }, 400);
+    }
+
+    // Two reads, deliberately. The in-flight check needs the newest run of ANY
+    // kind, but the spend caps must see only paid ones — 100 is GitHub's
+    // maximum page size, and every commit to main produces a free push run, so
+    // an unfiltered page fills with free runs and pushes paid ones out of the
+    // 30-day window. That made the monthly cap fail OPEN: measured, at three
+    // pushes per refresh it allowed 60 refreshes against a limit of 30.
+    let runs, dispatches;
     try {
-      runs = await recentRuns(env);
+      [runs, dispatches] = await Promise.all([
+        recentRuns(env),
+        recentRuns(env, "&event=workflow_dispatch"),
+      ]);
     } catch {
       return settle(
         { ok: false, error: "Could not check recent refreshes just now. Try again in a minute." },
@@ -143,6 +196,10 @@ export default {
       );
     }
 
+    // Deliberately global, not per company. Every run rebuilds and deploys the
+    // whole site and commits to the same data/ directory, so two at once would
+    // race on the push and the artifact — and this check is what stops a second
+    // one from ever being queued behind the first.
     const inFlight = runs[0] ?? null;
     if (inFlight && inFlight.status !== "completed") {
       return settle(
@@ -152,37 +209,48 @@ export default {
     }
 
     // Only manually-dispatched runs cost money — the workflow commits its data
-    // file back to main, and those push-triggered runs rebuild with --no-gather.
-    const paid = runs.filter((r) => r.event === "workflow_dispatch");
-    const since = (ms) => {
+    // files back to main, and those push-triggered runs rebuild with
+    // --no-gather, which blocks re-drafting as well as searching. Filtered
+    // again here rather than trusting the query alone: if the server-side
+    // filter ever stopped applying, counting free runs as paid errs towards
+    // refusing a refresh, which is the direction to be wrong in.
+    const paid = dispatches.filter((r) => r.event === "workflow_dispatch");
+    const mine = chargedTo(paid, company);
+    const within = (list, ms) => {
       const t = Date.now() - ms;
-      return paid.filter((r) => Date.parse(r.created_at) > t).length;
+      return list.filter((r) => Date.parse(r.created_at) > t).length;
     };
-    const spentToday = since(24 * 60 * 60 * 1000);
+
+    // Per company: one company's refreshing must not exhaust the other's day.
+    const spentToday = within(mine, 24 * 60 * 60 * 1000);
     if (spentToday >= MAX_REFRESHES_PER_DAY) {
       return settle(
         {
           ok: false,
-          error: `${spentToday} refreshes in the last 24 hours; the limit is ${MAX_REFRESHES_PER_DAY}. Try again later — the count drops as older ones age out.`,
-        },
-        429,
-      );
-    }
-    const spentMonth = since(30 * 24 * 60 * 60 * 1000);
-    if (spentMonth >= MAX_REFRESHES_PER_30_DAYS) {
-      return settle(
-        {
-          ok: false,
-          error: `${spentMonth} refreshes in the last 30 days; the limit is ${MAX_REFRESHES_PER_30_DAYS}. It frees up as older ones age out.`,
+          error: `${spentToday} refreshes for ${company} in the last 24 hours; the limit is ${MAX_REFRESHES_PER_DAY} per company. Try again later — the count drops as older ones age out.`,
         },
         429,
       );
     }
 
-    // Pace against the last PAID refresh, not the last run of any kind: the
-    // workflow commits its data file back to main, and those free rebuilds
-    // would otherwise lock the button for ten minutes after every config edit.
-    const lastPaid = paid[0] ?? null;
+    // Shared: both companies bill the same Apify plan and the same Anthropic
+    // key, so the monthly ceiling is on the total, not on each of them.
+    const spentMonth = within(paid, 30 * 24 * 60 * 60 * 1000);
+    if (spentMonth >= MAX_REFRESHES_PER_30_DAYS) {
+      return settle(
+        {
+          ok: false,
+          error: `${spentMonth} refreshes across all companies in the last 30 days; the shared limit is ${MAX_REFRESHES_PER_30_DAYS}. It frees up as older ones age out.`,
+        },
+        429,
+      );
+    }
+
+    // Pace against the last PAID refresh for THIS company, not the last run of
+    // any kind: the workflow commits its data files back to main, and those
+    // free rebuilds would otherwise lock the button for ten minutes after
+    // every config edit.
+    const lastPaid = mine[0] ?? null;
     if (lastPaid) {
       const startedAt = Date.parse(lastPaid.created_at);
       if (!Number.isFinite(startedAt)) {
@@ -197,7 +265,7 @@ export default {
         return settle(
           {
             ok: false,
-            error: `Refreshed ${Math.floor(minutes)} min ago. Wait ${wait} more min — each refresh costs money.`,
+            error: `${company} was refreshed ${Math.floor(minutes)} min ago. Wait ${wait} more min — each refresh costs money.`,
           },
           429,
         );
@@ -206,7 +274,7 @@ export default {
 
     const res = await github(env, `/actions/workflows/${WORKFLOW}/dispatches`, {
       method: "POST",
-      body: JSON.stringify({ ref: REF, inputs: { mode: "gather" } }),
+      body: JSON.stringify({ ref: REF, inputs: { mode: "gather", company } }),
     });
     if (!res.ok) {
       console.log("github dispatch failed", res.status, (await res.text()).slice(0, 200));

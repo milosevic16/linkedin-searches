@@ -4,9 +4,20 @@ A dashboard that puts **LinkedIn posts worth commenting on** in front of you,
 with Claude-written comment ideas ready to adapt — so building visibility takes
 minutes instead of an hour of scrolling.
 
+**It serves two companies**, each with its own dashboard, keywords, voice and
+budget:
+
+| | Dashboard | Settings |
+|---|---|---|
+| **Bloctopus Intelligence** | `https://milosevic16.github.io/linkedin-searches/` | [`companies/bloctopus.yml`](companies/bloctopus.yml) |
+| **Lemur Legal** | `https://milosevic16.github.io/linkedin-searches/lemur/` | [`companies/lemur.yml`](companies/lemur.yml) |
+
+The tabs at the top of either page switch between them. Everything below applies
+to both.
+
 **It refreshes when you ask it to, not on a schedule.** There is a **Refresh**
-button at the top of the dashboard and nothing runs until you press it. A refresh
-costs a couple of cents.
+button at the top of each dashboard and nothing runs until you press it. Refresh
+is per company: refreshing one does not search for, spend on, or touch the other.
 
 The page is organised **by topic**. Each topic gives you a **link into LinkedIn's
 own search**, pre-filtered to the last 24 hours and sorted newest-first, and
@@ -38,47 +49,76 @@ LinkedIn logged in as yourself.
 ## For the two of you (daily use)
 
 1. **Bookmark the dashboard:** `https://milosevic16.github.io/linkedin-searches/`
+   — the tabs at the top switch to Lemur Legal's and back.
 2. **Work one topic at a time.** Read the posts in its section and expand a
    post's drafts. Or click **Past 24 hours ↗** to open LinkedIn's own search for
    that topic, newest first, and comment on what's worth it there.
 3. **Always adapt a draft before posting** — two accounts pasting identical
    comments is the fastest way to look like bots.
-5. Want it refreshed right now? Actions tab → **Build dashboard** → *Run
-   workflow* → pick **gather** (needs a GitHub account with access to this repo).
+4. **Want fresh posts?** Type the password into the box at the top and press
+   **Refresh**. It searches for the company whose page you are on. Takes about
+   five minutes; reload the page when it's done.
 
 > You must be **logged in to LinkedIn** in the same browser for the top links to
 > work. If a link shows a login wall, log in and click it again.
 
 ### Changing what it searches for
 
-Everything lives in [`config.yml`](config.yml) — keywords, who you are, comment
-tone, freshness window. Edit it directly on GitHub (pencil icon → commit); the
-dashboard rebuilds itself in ~2 minutes. No coding involved.
+Each company's settings live in its own file — [`companies/bloctopus.yml`](companies/bloctopus.yml)
+and [`companies/lemur.yml`](companies/lemur.yml) — covering keywords, who you
+are, comment tone and freshness window. Edit one directly on GitHub (pencil icon
+→ commit); the dashboards rebuild themselves in ~2 minutes. No coding involved.
 
-**Editing config is cheap.** The gathered posts are stored in `data/latest.json`,
-so a rebuild only redoes the stage whose inputs actually changed:
+The files repeat each other in places (the same model names, the same
+thresholds) and that is deliberate rather than sloppy. Those settings decide
+whether a build has to pay to redo its work. Shared in one file, nudging
+`min_relevance` by a digit would re-draft **every** company at once and bill for
+all of them from a single commit. Kept separate, editing Lemur can never charge
+Bloctopus.
 
-| You edit | What re-runs | Cost |
+[`config.yml`](config.yml) holds only the roster and the refresh endpoint —
+nothing that costs money. The build refuses to start if a paid setting appears
+there, so that property cannot quietly rot.
+
+**Editing settings never spends money on its own.** Each company's gathered
+posts are stored in `data/<company>.json`, and a rebuild only redoes the stage
+whose inputs actually changed:
+
+| You edit | What happens | Cost |
 |---|---|---|
-| wording, layout, thresholds | the page only | **free** |
-| `voice`, `profile`, `model` | re-scores and re-drafts the stored posts | a couple of cents |
-| `keywords` | nothing until you press **Refresh** — new topics need a new search | **free** |
+| wording, layout | that company's page rebuilds | **free** |
+| `voice`, `profile`, `model`, `min_relevance` | page says the drafts are from the old settings, and to press **Refresh** | **free** |
+| `keywords`, search settings | page keeps the previous posts and asks you to press **Refresh** | **free** |
+| pressing **Refresh** | searches, scores and re-drafts, for that company only | **~$0.62** |
 
-So you can iterate on comment tone as often as you like without paying to search
-LinkedIn again each time. Only pressing **Refresh posts** starts a search.
-
-If you change a keyword, the page keeps showing the previous search's posts and
-tells you to press Refresh — an edit never spends credit on its own.
+Nothing is billed until someone presses Refresh. That is the whole design: a
+commit can never start a search or a re-write, only the button can.
 
 Each build prints a cost table to the Actions log — tokens per stage and an
 estimate in USD and EUR — and the page footer shows what that run cost.
+
+### Adding another company
+
+1. Copy an existing file to `companies/<slug>.yml` and edit the name, keywords,
+   profile and voice.
+2. Add the slug to `companies:` in [`config.yml`](config.yml).
+3. Add it to the `company:` choices in
+   [`.github/workflows/dashboard.yml`](.github/workflows/dashboard.yml) and to
+   `COMPANIES` in [`worker/refresh-worker.js`](worker/refresh-worker.js), then
+   redeploy the worker.
+
+Its page appears at `/<slug>/`. While the profile still contains
+`FILL-THIS-IN`, pressing Refresh renders the page but refuses to spend — a
+gather against template copy costs full price and produces drafts written for a
+company that does not exist.
 
 ---
 
 ## One-time setup (owner)
 
-The tool needs **one secret**: an Anthropic API key. It does the searching, the
-scoring, and the comment drafting.
+The tool needs **two secrets**: an Anthropic API key, which scores the posts and
+drafts the comments, and an Apify token, which finds the posts. Both are shared
+across the companies.
 
 ### 1. Get an Anthropic API key
 
@@ -88,14 +128,18 @@ scoring, and the comment drafting.
    and copy the value. It starts with `sk-ant-`. **Copy it now — the console
    will not show it again.**
 
-**Expected cost: roughly $2–4 per month.** Web searches are billed at $10 per
-1,000, and this tool runs about 10 per weekday; the scoring and drafting tokens
-add ~$1. You can cap spending in the console under **Billing → Limits**.
+**Expected cost: about $0.62 per refresh**, measured, not estimated — $0.44 of
+Anthropic tokens and $0.18 of Apify. Nothing runs on a schedule, so the monthly
+bill is however many times you press the button. The worker refuses past 30
+refreshes in 30 days across both companies, which puts the ceiling around $19 a
+month. You can also cap spending in the Anthropic console under
+**Billing → Limits**.
 
 ### 2. Wire it up on GitHub
 
 1. Repo **Settings → Secrets and variables → Actions → New repository secret**.
-   Name it exactly `ANTHROPIC_API_KEY`, paste the key, save.
+   Name it exactly `ANTHROPIC_API_KEY`, paste the key, save. Repeat for
+   `APIFY_TOKEN` (from <https://console.apify.com/> → Settings → API & Integrations).
 2. Repo **Settings → Pages** → under *Build and deployment* set **Source:
    GitHub Actions** (the first workflow run usually enables this by itself).
 3. Trigger the first run: Actions tab → **Build dashboard** → *Run workflow*.
@@ -103,11 +147,6 @@ add ~$1. You can cap spending in the console under **Billing → Limits**.
 
 If the secret is missing, the dashboard still deploys — it shows a friendly
 "setup needed" page instead of failing silently.
-
-> **Why not Google?** Google closed its free Custom Search JSON API to new
-> customers in January 2026 and shuts it down entirely on 1 January 2027, so it
-> is not an option for a new project. Claude's built-in web search replaces it
-> and needs no second account.
 
 > **Note on privacy:** the repo and the dashboard URL are public. Anyone with
 > the link can see your keywords and the drafted comments. Fine for most
@@ -124,10 +163,20 @@ If the secret is missing, the dashboard still deploys — it shows a friendly
 ```
 .github/workflows/dashboard.yml   manual button (+ config edits) → build → Pages
                                   no schedule: searching only happens on request
-config.yml                        keywords, profile, voice, thresholds, models
-scripts/build.py                  orchestrates; picks gather / redraft / render
-scripts/store.py                  data/latest.json + the fingerprint that decides
-                                  which stage actually needs to re-run
+                                  run-name carries the company; the worker reads
+                                  it back to know who spent what
+config.yml                        the roster, and the refresh endpoint. Nothing
+                                  that costs money may live here
+companies/<slug>.yml              one complete config per company: keywords,
+                                  profile, voice, thresholds, models
+scripts/companies.py              the roster and every per-company path
+scripts/build.py                  orchestrates; picks gather / redraft / render.
+                                  Paid work is scoped to one company; rendering
+                                  always covers all of them, because a Pages
+                                  deploy replaces the whole site
+scripts/store.py                  data/<slug>.json, data/<slug>-seen.json, and
+                                  the fingerprint that decides which stage
+                                  actually needs to re-run
 scripts/launcher.py               LinkedIn search deep-links (datePosted +
                                   sortBy=date_posted). Free — they are just URLs
 scripts/search_apify.py           Apify LinkedIn post search → posts, then the
@@ -141,60 +190,48 @@ scripts/render.py                 static HTML dashboard + data.json (remembers
                                   previously-shown URLs → NEW badges)
 ```
 
-- **Gathering and rendering are separate.** Searching is the only expensive part,
-  so its output is stored in `data/latest.json` and committed back by the
-  workflow. Rebuilding the page from that data costs nothing. See the table under
-  *Changing what it searches for*.
-- **Cost control, in descending order of impact:** the pause-turn resume loop is
-  prompt-cached (without it every resume re-billed every search result already
-  gathered); the search step runs on Sonnet at medium effort rather than Opus at
-  the default high effort with thinking on; the scoring system prompt is cached
-  across batches. Scoring and drafting stay on Opus — that is the output you read.
-
-- **No hallucinated links:** URLs come from the search tool's own result blocks,
-  not from Claude's prose. Anything the model mentions that the search did not
-  actually return is discarded before it can reach the dashboard.
-- **How many posts you get:** one web search returns roughly 10 results and that
-  count is not adjustable — the API bills per *search*, not per result. So the
-  only lever on volume is `searches_per_keyword` in `config.yml` (each phrased
-  differently to widen the net). The "Notable" section is often small, or empty
-  on niche keywords; that is the index being thin, not a bug. The live search
-  links never run dry, because LinkedIn answers those queries itself.
-- **Only vouched-for posts are shown.** The model applies the recency and quality
-  rules and returns a filtered list; the raw result set (full of 2021–2023 posts)
-  is used solely as a URL whitelist. If it finds nothing suitable it returns an
-  empty list and the section says so, rather than padding with stale posts.
-- **Dynamic filtering is on.** The search tool prunes results inside code
-  execution before they reach the context window. It was switched off at first,
-  to be sure no candidate post was dropped before the model could judge it —
-  but measuring a real run showed that choice was pushing roughly 50,000 tokens
-  of raw results per keyword and accounted for 88% of the bill. The tradeoff
-  now runs the other way: a marginal post may be filtered out unseen.
-- **The URL whitelist survives either setting.** Harvesting walks the response
-  tree for `web_search_result` blocks rather than assuming they sit at the top
-  level, because with filtering on they may not. If a keyword's results are
-  described but none match a harvested URL, the run warns instead of silently
-  rendering an empty topic.
-- **Dedupe:** the previous deploy's `data.json` is fetched over HTTPS, so posts
-  already shown on an earlier run lose their NEW badge.
-- **Two windows, two settings:** `fresh_window` controls the LinkedIn links at the
-  top (`past-24h` / `past-week` / `past-month`); `notable_days` controls how far
-  back the scored section reaches. Setting `notable_days` under ~30 will usually
-  return nothing, because the index is that sparse.
+- **Gathering and rendering are separate.** Searching and drafting are the only
+  expensive parts, so their output is stored in `data/<company>.json` and
+  committed back by the workflow. Rebuilding a page from that data costs nothing.
+- **Nothing but the button spends.** A push runs with `--no-gather`, which blocks
+  both searching *and* re-drafting. That second half matters more than it looks:
+  a re-draft is about $0.42, it is what a `min_relevance` or `model` edit
+  triggers, and none of the spend caps in the worker can see a push.
+- **Paid work is scoped to one company; rendering is not.** A GitHub Pages deploy
+  replaces the entire site, so a run that rendered only the company it gathered
+  for would 404 the other one. Rendering is free, so every run rebuilds every
+  page and the deploy is always complete.
+- **Filters run in code, before any AI sees a post:** the publication date is
+  decoded from the post's own URL and anything past `notable_max_age_hours` is
+  dropped, then anything matching no keyword is dropped. Only what survives costs
+  tokens.
+- **Two ceilings live in code, not config.** `max_enriched` is the only real
+  brake on the Anthropic side of the bill — around 70% of it — so `enrich.py`
+  caps it regardless of what a config file asks for. `max_usd_per_run` guards the
+  Apify side, and refuses the run rather than trimming it, because Apify charges
+  on posts returned.
+- **NEW badges** come from `data/<company>-seen.json`, in git. It used to live
+  only on the published site and be fetched back over HTTPS, which meant a
+  transient error read as "nothing seen yet" and wiped it — and once there were
+  two companies, publishing one page would have deleted the other's copy.
 - **Failure behavior:** rate limits, API errors, and skipped steps surface as a
-  yellow warning box on the dashboard itself rather than an empty page.
+  yellow warning box on the dashboard itself rather than an empty page. A failed
+  search keeps the previous posts rather than replacing them with nothing.
 
 ## Local development
 
 ```bash
 pip install -r requirements.txt
-python scripts/build.py --sample        # offline preview, no API key needed
+python scripts/build.py --sample                     # offline preview, no key
+node worker/test.mjs                                 # spend-cap tests (in worker/)
 
-ANTHROPIC_API_KEY=… python scripts/build.py --gather    # full run, costs money
-ANTHROPIC_API_KEY=… python scripts/build.py --redraft   # re-score stored posts
-ANTHROPIC_API_KEY=… python scripts/build.py --render    # rebuild page, free
-ANTHROPIC_API_KEY=… python scripts/build.py --auto      # cheapest sufficient mode
+ANTHROPIC_API_KEY=… python scripts/build.py --company lemur --gather   # costs money
+ANTHROPIC_API_KEY=… python scripts/build.py --company lemur --redraft  # costs money
+ANTHROPIC_API_KEY=… python scripts/build.py --render                   # free
+ANTHROPIC_API_KEY=… python scripts/build.py --auto --no-gather         # what a push runs
 ```
 
-`--render` and `--redraft` need a `data/latest.json` to work from; without one
-they fall back to gathering and say so. Every run prints a cost table at the end.
+`--gather` and `--redraft` spend money, so they refuse to run without
+`--company`. `--render` and `--redraft` need a `data/<company>.json` to work
+from; without one they fall back to gathering and say so. Every run prints a cost
+table at the end.

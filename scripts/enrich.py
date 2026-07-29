@@ -20,6 +20,13 @@ from models import output_config
 SCORE_CHUNK = 12   # scoring emits a line per post — batches can be larger
 DRAFT_CHUNK = 6    # drafting emits three comments per post — keep batches small
 
+# The hard ceiling on how many posts one run will pay to score, whatever a
+# config file asks for. Drafting is the largest single line on the bill —
+# around 70% of it, measured — and max_enriched is the only thing that bounds
+# it, so it does not belong entirely in a file anyone can edit. 150 is roughly
+# what 11 keywords return; a config may lower this, never raise it.
+MAX_ENRICHED_CEILING = 200
+
 # With a real post body rather than a search snippet, there is enough to judge
 # on. The cap only guards against a runaway result.
 _TEXT_CHARS = 2000
@@ -97,7 +104,7 @@ Penalise job ads, company self-promotion with no discussion value, and posts \
 that only mention a keyword in passing. Reward posts by relevant people that \
 invite discussion. Keep the reason to one plain sentence."""
 
-_DRAFT_SYSTEM = """You draft LinkedIn comments for two professionals.
+_DRAFT_SYSTEM = """You draft LinkedIn comments for {commenters}.
 
 Who they are and why they comment:
 {profile}
@@ -192,7 +199,16 @@ def enrich_posts(posts: list[dict], cfg: dict, usage=None) -> tuple[list[dict], 
     draft_model = cfg.get("model") or "claude-sonnet-5"
     min_rel = int(cfg.get("min_relevance", 5))
 
-    limit = int(cfg.get("max_enriched", 30))
+    # A ceiling in code, not just in config. max_enriched is the only real
+    # brake on the Anthropic side of the bill — max_usd_per_run guards Apify,
+    # which is under a third of it — so a config file must be able to lower it
+    # but never raise it past what one run should ever cost.
+    limit = min(int(cfg.get("max_enriched", 30)), MAX_ENRICHED_CEILING)
+    if int(cfg.get("max_enriched", 30)) > MAX_ENRICHED_CEILING:
+        warnings.append(
+            f"max_enriched is above the {MAX_ENRICHED_CEILING}-post ceiling built into "
+            f"enrich.py; scoring {MAX_ENRICHED_CEILING} posts this run."
+        )
     targets = posts[:limit]
     if len(posts) > limit:
         warnings.append(f"{limit} of {len(posts)} posts were scored (max_enriched).")
@@ -233,7 +249,10 @@ def enrich_posts(posts: list[dict], cfg: dict, usage=None) -> tuple[list[dict], 
     if not worth_it:
         return posts, warnings
 
-    draft_system = _DRAFT_SYSTEM.format(profile=profile, voice=voice)
+    draft_system = _DRAFT_SYSTEM.format(
+        profile=profile, voice=voice,
+        commenters=(cfg.get("commenters") or "").strip() or "a professional services firm",
+    )
     for start in range(0, len(worth_it), DRAFT_CHUNK):
         chunk = worth_it[start : start + DRAFT_CHUNK]
         parsed = _call(

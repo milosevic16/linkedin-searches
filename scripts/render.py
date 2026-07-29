@@ -1,4 +1,4 @@
-"""Render the dashboard: site/index.html + site/data.json.
+"""Render one company's dashboard into its own directory under site/.
 
 The page is organised by TOPIC. Each topic gets a deep link into LinkedIn's
 own search, and underneath it the posts found for that topic, each with three
@@ -7,8 +7,12 @@ drafts written for that specific post.
 When search.find_posts is off, a topic is just its links — nothing is fetched,
 so there is nothing to draft against.
 
-site/data.json carries the URLs already shown, fetched back from the live
-Pages deploy on the next run so repeats aren't re-flagged as new.
+Which URLs have already been shown is read from and written back to git (see
+store.load_seen). It used to live only on the published site and be fetched
+back over HTTPS, which failed in two ways worth remembering: a transient error
+read as "nothing seen yet" and wiped the history, and once a second company
+existed, publishing one company's page would have deleted the other's file
+along with it — GitHub Pages replaces the whole site on every deploy.
 """
 
 from __future__ import annotations
@@ -18,10 +22,6 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-
-import requests
-
-SEEN_CAP = 1500
 
 try:
     from zoneinfo import ZoneInfo
@@ -42,28 +42,33 @@ def _pages_base_url() -> str:
     return ""
 
 
-def _load_previous_seen() -> list[str] | None:
-    """URLs already shown, or None if the history could not be read.
+def _migrate_seen_from_site(company) -> list[str]:
+    """One-time bridge for the history that used to live only on the live site.
 
-    The distinction matters: an empty list is written back as the new
-    history, so returning [] on a failed fetch silently erases everything
-    ever shown and re-flags every post as NEW.
+    Before the seen-list moved into git it was published at <site>/data.json and
+    nowhere else. On the first run after that move the git file does not exist
+    yet, so fetch the published copy once and carry it over. Every later run
+    reads git and never comes here — which is the point of the move.
+
+    Returns [] on any failure. That is safe in a way the old code was not: this
+    only ever runs when there is no history in git to lose.
     """
     base = _pages_base_url()
     if not base:
         return []
+    url = f"{base}/{company.url_path}data.json"
     try:
-        resp = requests.get(f"{base}/data.json", timeout=10)
+        import requests
+
+        resp = requests.get(url, timeout=10)
+        if resp.status_code != 200:
+            return []
+        found = [u for u in resp.json().get("seen", []) if isinstance(u, str)]
     except Exception:
-        return None
-    if resp.status_code == 404:
-        return []          # first deploy: genuinely nothing seen yet
-    if resp.status_code != 200:
-        return None
-    try:
-        return [u for u in resp.json().get("seen", []) if isinstance(u, str)]
-    except Exception:
-        return None
+        return []
+    if found:
+        print(f"Carried {len(found)} previously-shown URLs over from {url}.")
+    return found
 
 
 def _esc(text: str) -> str:
@@ -246,24 +251,33 @@ def _setup_section() -> str:
 
 def render(
     posts: list[dict],
-    cfg: dict,
+    company,
     warnings: list[str],
     configured: bool = True,
     topics: list[dict] | None = None,
     usage: dict | None = None,
     gathered_at: str | None = None,
     mark_new: bool = True,
+    endpoint: str = "",
+    siblings: list | None = None,
+    persist_seen: bool = True,
 ) -> None:
+    import store
+
+    cfg = company.cfg
     searching = bool((cfg.get("search") or {}).get("find_posts", False))
-    site = Path(__file__).resolve().parent.parent / "site"
-    site.mkdir(exist_ok=True)
+    site = company.site_dir
+    site.mkdir(parents=True, exist_ok=True)
     topics = topics or []
+    siblings = siblings or [company]
 
     # Always load the history — it gets written back below, so skipping the
     # load would silently truncate it on a render-only rebuild. Only the
     # is_new *decision* is skipped: on a rebuild the posts are unchanged, and
     # re-deciding would mark everything as already-seen and drop the flags.
-    loaded = _load_previous_seen()
+    loaded = store.load_seen(company)
+    if loaded == [] and not company.seen_path.exists():
+        loaded = _migrate_seen_from_site(company)
     history_readable = loaded is not None
     prev_seen = loaded or []
     seen_set = set(prev_seen)
@@ -322,7 +336,7 @@ def render(
                 f"""<section class="topic-block" id="t-other">
                   <div class="topic-head"><div class="topic-id">
                     <h2 class="topic-h">Other matches</h2>
-                    <p class="topic-meta">Found under keywords no longer in config.yml</p>
+                    <p class="topic-meta">Found under keywords no longer in {_esc(company.config_rel)}</p>
                   </div></div>
                   <div class="cards">{"".join(_card(p) for p in leftovers)}</div>
                 </section>"""
@@ -354,13 +368,13 @@ def render(
     # The password is typed by the visitor and checked by a proxy that owns
     # the GitHub token; nothing secret is ever served here. Without an
     # endpoint configured, fall back to linking at the Actions page.
-    endpoint = (cfg.get("refresh_endpoint") or "").strip()
+    endpoint = (endpoint or "").strip()
     if endpoint:
         refresh_html = f"""<section class="refresh">
           <div class="refresh-text">
             <strong>Posts are only searched for when you ask.</strong>
-            <span>Finds posts from the last 48 hours and writes fresh drafts.
-            Takes about 5 minutes and costs roughly EUR 0.35.</span>
+            <span>Finds posts from the last 48 hours for {_esc(company.name)} and writes
+            fresh drafts. Takes about 5 minutes and costs roughly EUR 0.60.</span>
           </div>
           <form class="refresh-form" id="refresh-form" autocomplete="off">
             <input class="refresh-pw" id="refresh-pw" type="password"
@@ -380,6 +394,17 @@ def render(
              target="_blank" rel="noopener">Refresh posts&nbsp;↗</a>
         </section>"""
 
+    # Only shown once there is more than one company to switch between, so a
+    # single-company setup looks exactly as it always did.
+    switcher = ""
+    if len(siblings) > 1:
+        tabs = "".join(
+            f'<a class="cotab{" active" if s.slug == company.slug else ""}" '
+            f'href="{_esc(company.link_to(s))}">{_esc(s.name)}</a>'
+            for s in siblings
+        )
+        switcher = f'<nav class="cotabs">{tabs}</nav>'
+
     cost_note = ""
     if usage and usage.get("usd"):
         cost_note = (
@@ -396,7 +421,7 @@ def render(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>LinkedIn Comment Radar</title>
+<title>{_esc(company.name)} — LinkedIn Comment Radar</title>
 <style>
 :root {{
   --bg: #f6f4ef; --surface: #ffffff; --ink: #1f2a33; --ink-2: #52616d; --ink-3: #8a96a0;
@@ -422,6 +447,10 @@ body {{
 .wrap {{ max-width: 820px; margin: 0 auto; padding: 24px 16px 64px; }}
 header h1 {{ font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }}
 .sub {{ color: var(--ink-2); font-size: 13px; margin: 0 0 18px; }}
+.cotabs {{ display: flex; gap: 6px; margin: 0 0 14px; flex-wrap: wrap; }}
+.cotab {{ font-size: 13px; font-weight: 600; text-decoration: none; padding: 5px 12px;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); }}
+.cotab.active {{ background: var(--ink); border-color: var(--ink); color: var(--bg); }}
 .stats {{ display: flex; gap: 10px; margin: 0 0 18px; flex-wrap: wrap; }}
 .stat {{ background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
   padding: 8px 14px; display: flex; flex-direction: column; min-width: 92px; box-shadow: var(--shadow); }}
@@ -515,8 +544,9 @@ code {{ background: var(--low-bg); border-radius: 5px; padding: 1px 5px; font-si
 <body>
 <div class="wrap">
   <header>
-    <h1>LinkedIn Comment Radar</h1>
-    <p class="sub">Your LinkedIn commenting shortlist</p>
+    {switcher}
+    <h1>{_esc(company.name)}</h1>
+    <p class="sub">LinkedIn Comment Radar — your commenting shortlist</p>
     <p class="freshness">{_esc(freshness)}</p>
   </header>
   {stats}
@@ -524,10 +554,11 @@ code {{ background: var(--low-bg); border-radius: 5px; padding: 1px 5px; font-si
   {warn_html}
   {body_main}
   <footer>{cost_note}Adapt every draft before posting — identical comments from two accounts read as bots.<br>
-  Topics and voice live in <a href="https://github.com/{_esc(repo)}/blob/main/config.yml">config.yml</a>.</footer>
+  Topics and voice live in <a href="https://github.com/{_esc(repo)}/blob/main/{_esc(company.config_rel)}">{_esc(company.config_rel)}</a>.</footer>
 </div>
 <script>
 const REFRESH_ENDPOINT = {json.dumps(endpoint)};
+const COMPANY = {json.dumps(company.slug)};
 const form = document.getElementById("refresh-form");
 if (form) {{
   const pw = document.getElementById("refresh-pw");
@@ -542,7 +573,7 @@ if (form) {{
       const res = await fetch(REFRESH_ENDPOINT, {{
         method: "POST",
         headers: {{ "Content-Type": "application/json" }},
-        body: JSON.stringify({{ password: pw.value }}),
+        body: JSON.stringify({{ password: pw.value, company: COMPANY }}),
       }});
       const data = await res.json().catch(() => ({{}}));
       if (res.ok) {{
@@ -584,23 +615,30 @@ document.addEventListener("click", (e) => {{
 
     (site / "index.html").write_text(page, encoding="utf-8")
 
-    # Persist state for the next run: everything ever shown, capped.
+    # Persist state for the next run: everything ever shown, capped. This goes
+    # to git, not just to the published site — a deploy replaces the whole site,
+    # so a file that only lived there would be deleted the moment another
+    # company's page was published without it.
     merged_seen = list(prev_seen)
-    if history_readable:
+    if history_readable and persist_seen:
         for post in posts:
             url = post.get("url")
             if url and url not in seen_set:
                 seen_set.add(url)
                 merged_seen.append(url)
-        if len(merged_seen) > SEEN_CAP:
-            merged_seen = merged_seen[-SEEN_CAP:]
+        merged_seen = merged_seen[-store.SEEN_CAP:]
+        store.save_seen(company, merged_seen)
+    # A published copy of what the page shows. Nothing reads it back any more —
+    # the seen-list it used to carry now lives in git — so it is output only.
     (site / "data.json").write_text(
         json.dumps(
             {
-                # Deliberately the gather time, not now(): this file is
-                # published on every render, and a fresh timestamp would make
-                # identical data deploy as a different byte stream every time.
-                "generated_at": gathered_at or now.isoformat(),
+                # The gather time, never now(): this file is published on every
+                # render, and a fresh timestamp would make identical data deploy
+                # as a different byte stream every time. A company with nothing
+                # gathered yet gets null rather than a clock reading, for the
+                # same reason.
+                "generated_at": gathered_at,
                 "seen": merged_seen,
                 "posts": [
                     {k: p.get(k) for k in ("url", "author", "title", "relevance", "keywords")}

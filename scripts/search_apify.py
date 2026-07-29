@@ -43,7 +43,7 @@ ENDPOINT = f"https://api.apify.com/v2/acts/{ACTOR}/run-sync-get-dataset-items"
 USD_PER_1000_POSTS = 2.00
 
 _TIMEOUT_S = 540
-_MAX_PER_KEYWORD = 100      # a typo in config.yml should not be a $100 run
+_MAX_PER_KEYWORD = 100      # a typo in a company config must not be a $100 run
 
 _URL_KEYS = ("linkedinUrl", "url", "postUrl", "shareLinkedinUrl", "post_url", "link", "permalink")
 _TEXT_KEYS = ("content", "text", "postContent", "post_text", "description", "commentary")
@@ -244,7 +244,8 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
         per_keyword = int(search_cfg.get("posts_per_keyword", 10))
     except (TypeError, ValueError):
         per_keyword = 10
-        warnings.append("posts_per_keyword in config.yml is not a number — using 10.")
+        where = cfg.get("config_file") or "the company's config file"
+        warnings.append(f"posts_per_keyword in {where} is not a number — using 10.")
     per_keyword = max(1, min(_MAX_PER_KEYWORD, per_keyword))
 
     expected = per_keyword * len(keywords)

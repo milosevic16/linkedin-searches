@@ -1,0 +1,189 @@
+# ──────────────────────────────────────────────────────────────────────
+#  Lemur Legal — LinkedIn Comment Radar
+#
+#  HOW TO EDIT (no tools needed):
+#  1. Open this file on GitHub and click the pencil icon (top right).
+#  2. Change the text below.
+#  3. Click "Commit changes".
+#  The dashboard rebuilds itself within a couple of minutes — for free.
+#  Editing KEYWORDS, PROFILE, VOICE or a MODEL is the exception: those change
+#  what the AI produces, so the page keeps showing the previous results and
+#  asks you to press "Refresh posts". Nothing is billed until you press it.
+#
+#  This file is complete on its own — nothing in it is shared with the other
+#  company's dashboard. config.yml explains why that is deliberate.
+# ──────────────────────────────────────────────────────────────────────
+
+# Shown in the page header and in the switcher between dashboards.
+name: Lemur Legal
+
+# How many people actually post these comments. Keeps the drafts from reading
+# as one person's voice when they are shared out.
+commenters: a small specialist legal team
+
+# Topics to watch. Each becomes a live LinkedIn search link (free) plus a
+# paid search of recent posts. Chosen for where the BUYERS and REFERRERS of
+# tech-law work talk — founders mid-authorisation, VCs, and other lawyers —
+# not where consumers of legal content talk in general.
+keywords:
+  # ── MiCA & crypto: the CASP transition is the live wound in 2026 ──
+  - "MiCA CASP licence application"
+  - "crypto asset service provider authorisation"
+  - "crypto token legal opinion"
+  - "stablecoin regulation EU"
+  - "tokenisation real world assets"
+
+  # ── Startups & deep tech ──
+  - "startup SAFE convertible funding round"
+  - "EU AI Act compliance"
+  - "deep tech startup Europe"
+
+  # ── Defence & dual-use ──
+  - "dual use export control"
+  - "defence tech startup Europe"
+
+  # ── Home market (Slovenian-language posts) ──
+  - "pravno svetovanje startup"
+
+# Who is commenting, and why. Claude uses this to judge which posts deserve
+# your time and to draft comments that sound like Lemur Legal.
+profile: |
+  We are Lemur Legal (lemur.legal), a specialist tech-law firm in Ljubljana,
+  Slovenia, founded in 2016 and working across the EU. We position ourselves
+  as tech law for crypto, deep tech and defence — "legal for tech", not a
+  general practice that also takes crypto work.
+
+  Managing partner: dr. Peter Merc, who lectures at the Law Faculty of the
+  New University in Ljubljana and founded Blockchain Think Tank Slovenia in
+  2017 as a bridge between the crypto industry and the public sector. We are
+  a small team, which is the point: clients deal with the person doing the
+  work.
+
+  Three practice pillars:
+  - MiCA and crypto. Token classification and legal opinions (utility tokens,
+    e-money tokens, asset-referenced tokens), tokenomics review, white papers,
+    terms of sale, SAFTs and marketing material, CASP authorisation and the
+    VASP-to-CASP transition, and dealings with ATVP and Banka Slovenije. We
+    have advised on more than 20 token generation events and on NFT
+    transactions; clients have included GateHub, CargoX, Blocksquare, EllyPay,
+    Bitnik and Dap19.
+  - Startups and deep tech. Company formation, founder and shareholder
+    agreements, SAFEs and convertibles, cap tables, ESOPs, IP assignment,
+    trademark registration and protection, commercial contracts, and AI Act
+    readiness. Fintech and gaming/esports are where we are most at home.
+  - Defence and dual-use. Export control and dual-use classification,
+    procurement and grant conditions, and the IP and security questions that
+    come with civil-military technology.
+
+  Commercials: fixed fee wherever scope allows — a legal opinion on a crypto
+  utility token is typically EUR 1,500-2,500 plus VAT, depending on how
+  complex the tokenomics are and how much documentation there is to review.
+  Hourly otherwise.
+
+  WHO WE WANT TO REACH by commenting — in priority order:
+  1. Founders, GCs and compliance leads at crypto and fintech companies
+     dealing with CASP authorisation — either mid-application, or caught out
+     by the 1 July 2026 deadline for existing VASPs. This is the most urgent
+     buyer we have.
+  2. Founders and CTOs in deep tech, defence and dual-use who are raising,
+     contracting or exporting and have not yet hit the legal questions.
+  3. VCs, accelerators, angels and startup-ecosystem people — our strongest
+     referral channel, because they meet the need before the founder does.
+  4. Other lawyers and compliance officers across the EU who refer specialist
+     crypto and token work rather than doing it in house.
+  5. Public sector and the Slovenian and wider EU startup community:
+     regulators, supervisors, ministries, industry bodies.
+
+  Score posts LOW when the poster is a retail investor describing their own
+  loss, or asking what to do about a scam: commenting there reads as
+  ambulance-chasing. Also score low: token shills, price and airdrop
+  speculation, "get your licence in two weeks" offshore incorporation
+  outfits, recruiter posts, event promotion with no substance, and generic
+  motivational business content.
+
+# Tone guidance for the drafted comments.
+voice: |
+  Precise, current and practical — a practitioner who has actually filed the
+  application, not a commentator summarising the regulation.
+
+  Do:
+  - Name the instrument and the provision when it carries weight: MiCAR's
+    white paper duties, the CASP authorisation regime and its transitional
+    rules, the AI Act's risk tiers, Regulation 2021/821 on dual-use. The
+    precision IS the credential.
+  - Add the practical consequence: the deadline, which authority actually
+    decides, what the filing requires in practice, where applications stall.
+  - Draw the distinction others blur — utility token vs e-money token vs
+    asset-referenced token; VASP registration vs CASP authorisation; a white
+    paper notification vs an approval that does not exist.
+  - Correct a factual error about the law plainly, without scoring points.
+  - Ask a sharp question when we have one. Disagree when we have grounds.
+  - Write in the SAME LANGUAGE as the post (Slovenian post -> Slovenian).
+  - Keep it short: 1-3 sentences, plain paragraphs.
+
+  Never:
+  - Never give legal advice on the reader's own situation, never tell someone
+    what they should do about their facts, and never write anything that
+    could read as taking them on as a client. Speak to the general legal
+    position; the enquiry follows on its own.
+  - Never predict how a regulator or a court will decide a specific matter.
+  - Never pitch, quote a fee, or say "DM us" / "happy to help with this".
+  - Never name a client, a matter or a filing that is not already public.
+  - No hashtags, no emoji, no "Great post!", no restating the post back.
+
+search:
+  # ── Top of dashboard: live LinkedIn search links ────────────────────
+  # How recent the posts behind each link should be.
+  # Options: past-24h, past-week, past-month
+  fresh_window: past-24h
+
+  # Where posts come from. See companies/bloctopus.yml for the full note on
+  # why "web" is kept only as a fallback: search engines index LinkedIn
+  # months late, which is useless when engagement is over in 48 hours.
+  provider: apify
+
+  find_posts: true
+
+  # Hard age limit, enforced in code against the date encoded in each post's
+  # own URL — never left to the model, which cannot see a publication date.
+  notable_max_age_hours: 48
+
+  # The cost dial. Per keyword, so 11 keywords x 10 is about 110 posts at
+  # roughly $2 per 1000.
+  posts_per_keyword: 10
+
+  # newest first, so the age limit keeps the most posts
+  sort_by: date
+
+  # Hard brake: the run refuses to start if the request would cost more than
+  # this. Apify charges on posts RETURNED, so no filter downstream can undo
+  # an over-large request.
+  max_usd_per_run: 1.00
+
+  include_articles: true     # also match linkedin.com/pulse articles
+
+  # Only used when provider is "web".
+  searches_per_keyword: 2
+
+# Posts scoring below this (0-10) are tucked into a collapsed section.
+min_relevance: 5
+
+# Cap on posts sent for scoring. Scoring is cheap and only posts clearing
+# min_relevance go on to the expensive drafting model, so this can exceed
+# what a search returns — anything above it renders unjudged, which is worse
+# than the few cents scoring costs.
+max_enriched: 150
+
+# ── Models ────────────────────────────────────────────────────────────
+# Deciding which posts are worth commenting on. Runs over every post that
+# survived the date and keyword filters, and with the real post text in
+# front of it this is an easy judgement — so the cheapest model.
+score_model: claude-haiku-4-5
+
+# Writing the actual comments. Only runs for posts that cleared
+# min_relevance, so it is a fraction of the input — worth a better model,
+# because this is the text you read and paste.
+model: claude-sonnet-5
+
+# Only used when search.provider is "web".
+search_model: claude-sonnet-5

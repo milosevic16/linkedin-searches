@@ -1,4 +1,9 @@
-import worker from "./refresh-worker.js";
+// Set BEFORE the worker module is evaluated, so its MIN_RESPONSE_MS reads 0.
+// A static `import` is hoisted above every statement in the file, so this has
+// to be a dynamic one — with a plain import the flag was set too late and the
+// whole suite silently paid the real 4-second delay on every single case.
+globalThis.__TEST_FAST__ = true;
+const { default: worker } = await import("./refresh-worker.js");
 
 const ENV = {
   GITHUB_TOKEN: "tok",
@@ -16,19 +21,41 @@ function mockFetch(runsHandler, dispatchStatus = 204) {
       dispatched++;
       return new Response(dispatchStatus === 204 ? null : "err", { status: dispatchStatus });
     }
-    return runsHandler();
+    return runsHandler(String(url));
   };
 }
 
-const ok = (runs) => () =>
-  new Response(JSON.stringify({ workflow_runs: runs }), { status: 200 });
+// Applies ?event=… the way GitHub does. The worker asks for the paid runs with
+// that filter, so a mock that ignored it would hand back push runs where the
+// real API never would, and the caps would be tested against the wrong list.
+const ok = (runs) => (url = "") =>
+  new Response(
+    JSON.stringify({
+      workflow_runs: url.includes("event=workflow_dispatch")
+        ? runs.filter((r) => r.event === "workflow_dispatch")
+        : runs,
+    }),
+    { status: 200 },
+  );
 const fails = (status) => () => new Response("rate limited", { status });
 
 const iso = (minsAgo) => new Date(Date.now() - minsAgo * 60000).toISOString();
+
+// No display_title by default: that is what every run created before the
+// company was recorded looks like, and those must count against EVERY company
+// rather than none. The tests below rely on it — an untitled run behaving like
+// a bloctopus run is the fail-closed property, not an accident.
 const dispatchRun = (minsAgo, status = "completed") => ({
   event: "workflow_dispatch",
   status,
   created_at: iso(minsAgo),
+});
+
+const runFor = (slug, minsAgo, status = "completed") => ({
+  event: "workflow_dispatch",
+  status,
+  created_at: iso(minsAgo),
+  display_title: `Dashboard gather company:${slug}`,
 });
 
 const pushRun = (minsAgo, status = "completed") => ({
@@ -71,7 +98,11 @@ await check("no runs at all -> dispatch allowed",
 
 // --- daily cap --- (read from the worker, so raising a cap does not
 // silently turn its own test into a no-op)
-const src = await import("node:fs").then((fs) => fs.readFileSync("./refresh-worker.js", "utf8"));
+// Resolved against this file, not the shell's cwd, so `node worker/test.mjs`
+// from the repo root works as well as `node test.mjs` from inside worker/.
+const src = await import("node:fs").then((fs) =>
+  fs.readFileSync(new URL("./refresh-worker.js", import.meta.url), "utf8"),
+);
 const CAP_DAY = Number(src.match(/MAX_REFRESHES_PER_DAY = (\d+)/)[1]);
 const CAP_MONTH = Number(src.match(/MAX_REFRESHES_PER_30_DAYS = (\d+)/)[1]);
 
@@ -173,6 +204,118 @@ await check("100 runs returned, all recent -> saturates, fails CLOSED",
 await check("push runs do not count toward monthly cap",
   post({ password: "bloctopus" }), ENV,
   ok(Array.from({ length: 40 }, (_, i) => ({ event: "push", status: "completed", created_at: iso(60 * (30 + i * 6)) }))), 202, 1);
+
+// ── per-company attribution ──────────────────────────────────────────
+// The cooldown and the daily cap are per company; the monthly cap is shared.
+
+await check("bloctopus refreshed 2 min ago -> lemur is NOT in cooldown",
+  post({ password: "bloctopus", company: "lemur" }), ENV, ok([runFor("bloctopus", 2)]), 202, 1);
+await check("bloctopus refreshed 2 min ago -> bloctopus IS in cooldown",
+  post({ password: "bloctopus", company: "bloctopus" }), ENV, ok([runFor("bloctopus", 2)]), 429, 0);
+
+const bloctopusAtCap = Array.from({ length: CAP_DAY }, (_, i) => runFor("bloctopus", 30 + i * 60));
+await check(`bloctopus at its daily cap -> lemur still allowed`,
+  post({ password: "bloctopus", company: "lemur" }), ENV, ok(bloctopusAtCap), 202, 1);
+await check(`bloctopus at its daily cap -> bloctopus refused`,
+  post({ password: "bloctopus", company: "bloctopus" }), ENV, ok(bloctopusAtCap), 429, 0);
+
+// The monthly cap is deliberately NOT per company: one Apify plan, one
+// Anthropic key. Split evenly, neither company is near its own daily cap.
+const sharedMonth = Array.from({ length: CAP_MONTH }, (_, i) =>
+  runFor(i % 2 ? "lemur" : "bloctopus", 60 * (30 + i * 12)));
+await check(`${CAP_MONTH} refreshes split across both -> shared monthly cap refuses lemur`,
+  post({ password: "bloctopus", company: "lemur" }), ENV, ok(sharedMonth), 429, 0);
+await check(`${CAP_MONTH} refreshes split across both -> shared monthly cap refuses bloctopus`,
+  post({ password: "bloctopus", company: "bloctopus" }), ENV, ok(sharedMonth), 429, 0);
+
+// Attribution that cannot be read must make the caps STRICTER, never laxer.
+// This is the failure mode that would otherwise silently uncap spending.
+const untitled = Array.from({ length: CAP_DAY }, (_, i) => dispatchRun(30 + i * 60));
+await check("runs with no company in the title -> counted against every company",
+  post({ password: "bloctopus", company: "lemur" }), ENV, ok(untitled), 429, 0);
+await check("a title naming an unknown company -> counted against every company",
+  post({ password: "bloctopus", company: "lemur" }), ENV,
+  ok(Array.from({ length: CAP_DAY }, (_, i) => ({
+    event: "workflow_dispatch", status: "completed", created_at: iso(30 + i * 60),
+    display_title: "Dashboard gather company:acme",
+  }))), 429, 0);
+
+// A run already in flight blocks BOTH companies: every run rebuilds and
+// deploys the whole site and commits to the same data/ directory.
+await check("bloctopus run in flight -> lemur refused too",
+  post({ password: "bloctopus", company: "lemur" }), ENV,
+  ok([runFor("bloctopus", 1, "in_progress")]), 409, 0);
+
+// ── company validation ───────────────────────────────────────────────
+await check("unknown company -> 400, no dispatch",
+  post({ password: "bloctopus", company: "acme" }), ENV, ok([]), 400, 0);
+await check("company is checked AFTER the password, so it leaks nothing",
+  post({ password: "wrong", company: "acme" }), ENV, ok([]), 401, 0);
+await check("company omitted (older cached page) -> defaults, still works",
+  post({ password: "bloctopus" }), ENV, ok([]), 202, 1);
+await check("company with odd case/space -> normalised",
+  post({ password: "bloctopus", company: " Lemur " }), ENV, ok([]), 202, 1);
+
+// ── empty-password bypass ────────────────────────────────────────────
+// Two empty strings compare equal, so an unset secret used to accept "".
+await check("empty password vs real secret -> 401",
+  post({ password: "" }), ENV, ok([]), 401, 0);
+await check("empty password vs empty secret -> 401, never 202",
+  post({ password: "" }), { ...ENV, REFRESH_PASSWORD: "" }, ok([]), 500, 0);
+
+// ── the spend caps must not be evaded by free runs ───────────────────
+// GitHub returns at most 100 runs per page, and every commit to main makes a
+// free push run. Reading one unfiltered page let free runs push paid ones out
+// of the 30-day window: at three pushes per refresh this allowed 60 refreshes
+// against a cap of 30. The caps now query event=workflow_dispatch separately.
+{
+  const paidRuns = Array.from({ length: CAP_MONTH + 5 }, (_, i) =>
+    runFor(i % 2 ? "lemur" : "bloctopus", 60 * (30 + i * 20)));
+  const pushNoise = Array.from({ length: 300 }, (_, i) =>
+    ({ event: "push", status: "completed", created_at: iso(30 + i * 4) }));
+  // Exactly what GitHub does: newest first, one page, hard cap of 100.
+  const page = (list) => list
+    .slice()
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+    .slice(0, 100);
+
+  dispatched = 0;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes("/dispatches")) {
+      dispatched++;
+      return new Response(null, { status: 204 });
+    }
+    const filtered = String(url).includes("event=workflow_dispatch")
+      ? page(paidRuns)
+      : page([...paidRuns, ...pushNoise]);
+    return new Response(JSON.stringify({ workflow_runs: filtered }), { status: 200 });
+  };
+  const res = await worker.fetch(post({ password: "bloctopus", company: "lemur" }), ENV);
+  const body = await res.json().catch(() => ({}));
+  results.push({
+    name: "300 free push runs cannot hide paid runs from the monthly cap",
+    pass: res.status === 429 && dispatched === 0,
+    got: `${res.status}/d=${dispatched}`, want: "429/d=0", msg: body.error || "",
+  });
+}
+
+// The dispatch must name the company, or the workflow gathers for the wrong one.
+{
+  let sentBody = null;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes("/dispatches")) {
+      sentBody = JSON.parse(init.body);
+      return new Response(null, { status: 204 });
+    }
+    return new Response(JSON.stringify({ workflow_runs: [] }), { status: 200 });
+  };
+  await worker.fetch(post({ password: "bloctopus", company: "lemur" }), ENV);
+  results.push({
+    name: "dispatch passes the company through to the workflow",
+    pass: sentBody?.inputs?.company === "lemur" && sentBody?.inputs?.mode === "gather",
+    got: JSON.stringify(sentBody?.inputs), want: '{"mode":"gather","company":"lemur"}', msg: "",
+  });
+}
 
 let failed = 0;
 for (const r of results) {

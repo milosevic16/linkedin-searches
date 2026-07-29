@@ -3,14 +3,17 @@
 Searching LinkedIn is the expensive part of a build; rendering HTML is free.
 Until now they were welded together — the pipeline's output lived only in
 memory, so every rebuild re-ran every search, including rebuilds triggered by
-editing a word in config.yml.
+editing a word in a config file.
 
-This stores the gathered data in the repository. A rebuild then only needs to
-redo the stage whose inputs actually changed:
+This stores the gathered data in the repository, one file per company. A
+rebuild then only needs to redo the stage whose inputs actually changed:
 
     keywords / search settings changed  ->  gather   (searches again)
-    voice or profile changed            ->  redraft  (re-scores stored posts)
+    voice, profile or model changed     ->  redraft  (re-scores stored posts)
     anything else, or nothing           ->  render   (free)
+
+Each company's data is separate, so a change to one can never trigger paid
+work for the other.
 """
 
 from __future__ import annotations
@@ -20,9 +23,12 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_PATH = ROOT / "data" / "latest.json"
 
 GATHER, REDRAFT, RENDER = "gather", "redraft", "render"
+
+# Everything ever shown, capped. Old entries fall off the front; a post that
+# aged out and reappears simply reads as NEW again, which is harmless.
+SEEN_CAP = 1500
 
 
 def _digest(*parts) -> str:
@@ -66,6 +72,7 @@ def fingerprint(cfg: dict) -> dict:
         "draft": _digest(
             cfg.get("profile"),
             cfg.get("voice"),
+            cfg.get("commenters"),
             cfg.get("model"),
             cfg.get("score_model"),
             cfg.get("max_enriched"),
@@ -74,14 +81,15 @@ def fingerprint(cfg: dict) -> dict:
     }
 
 
-def save(*, cfg: dict, topics: list[dict], posts: list[dict], warnings: list[str],
+def save(company, *, topics: list[dict], posts: list[dict], warnings: list[str],
          usage: dict | None, generated_at: str) -> None:
-    DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    DATA_PATH.write_text(
+    path = company.data_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         json.dumps(
             {
                 "generated_at": generated_at,
-                "fingerprint": fingerprint(cfg),
+                "fingerprint": fingerprint(company.cfg),
                 "topics": topics,
                 "posts": posts,
                 "warnings": warnings,
@@ -94,14 +102,46 @@ def save(*, cfg: dict, topics: list[dict], posts: list[dict], warnings: list[str
     )
 
 
-def load() -> dict | None:
-    if not DATA_PATH.exists():
+def _read_json(path: Path):
+    if not path.exists():
         return None
     try:
-        data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
+
+
+def load(company) -> dict | None:
+    data = _read_json(company.data_path)
     return data if isinstance(data, dict) else None
+
+
+def load_seen(company) -> list[str] | None:
+    """URLs already shown, or None if the file exists but could not be read.
+
+    The distinction decides whether NEW badges are trustworthy: the list is
+    written back every render, so treating an unreadable file as "nothing seen
+    yet" would erase the history and re-flag every post as new. A file that is
+    simply absent is different — that is a genuine first run.
+    """
+    if not company.seen_path.exists():
+        return []
+    data = _read_json(company.seen_path)
+    if not isinstance(data, dict):
+        return None
+    urls = data.get("seen")
+    if not isinstance(urls, list):
+        return None
+    return [u for u in urls if isinstance(u, str)]
+
+
+def save_seen(company, urls: list[str]) -> None:
+    path = company.seen_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"seen": urls[-SEEN_CAP:]}, ensure_ascii=False, indent=1),
+        encoding="utf-8",
+    )
 
 
 def decide_mode(cfg: dict, stored: dict | None) -> tuple[str, str]:

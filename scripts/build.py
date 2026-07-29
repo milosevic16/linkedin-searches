@@ -1,16 +1,19 @@
-"""Build the dashboard.
+"""Build the dashboards.
 
 Gathering posts costs money; rendering the page does not. These are separate
 stages so that rebuilding the site does not re-run the searches.
 
 Usage:
-  python scripts/build.py --gather    # full run: search, score, draft, render
-  python scripts/build.py --redraft   # re-score stored posts (voice changed)
-  python scripts/build.py --render    # rebuild the page only — no API calls
-  python scripts/build.py --auto      # pick the cheapest sufficient mode
-  python scripts/build.py --sample    # offline preview with bundled sample data
+  python scripts/build.py --company bloctopus --gather   # search, score, draft
+  python scripts/build.py --company bloctopus --redraft  # re-score stored posts
+  python scripts/build.py --render                       # rebuild pages, free
+  python scripts/build.py --auto --company bloctopus     # cheapest sufficient
+  python scripts/build.py --sample                       # offline preview
 
-With no flag it gathers, so a plain scheduled run behaves as it always has.
+Paid work is always scoped to ONE company, named with --company. Rendering is
+not: every run rebuilds every company's page, because GitHub Pages replaces the
+whole site on each deploy — publishing one company's page alone would 404 the
+other's.
 """
 
 from __future__ import annotations
@@ -23,14 +26,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import yaml
-
+import companies as registry
 import store
 from enrich import enrich_posts
 from search_apify import SearchFailed
 from launcher import build_launcher
 from render import render
 from usage import Usage
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def _search_provider(cfg: dict):
@@ -42,13 +46,6 @@ def _search_provider(cfg: dict):
         return search_posts, "web search"
     from search_apify import search_posts       # LinkedIn's own search, via Apify
     return search_posts, "Apify"
-
-ROOT = Path(__file__).resolve().parent.parent
-
-
-def load_config() -> dict:
-    with open(ROOT / "config.yml", encoding="utf-8") as fh:
-        return yaml.safe_load(fh) or {}
 
 
 def _mode_from_argv(argv: list[str]) -> str:
@@ -62,81 +59,164 @@ def _mode_from_argv(argv: list[str]) -> str:
     return "auto" if "--auto" in argv else store.GATHER
 
 
-def _run_sample(cfg: dict) -> int:
+def _company_from_argv(argv: list[str]) -> str | None:
+    if "--company" in argv:
+        i = argv.index("--company")
+        if i + 1 < len(argv) and not argv[i + 1].startswith("-"):
+            return argv[i + 1]
+        raise registry.ConfigError("--company needs a name, e.g. --company bloctopus.")
+    return None
+
+
+def _run_sample(companies: list, endpoint: str) -> int:
     posts = json.loads((ROOT / "scripts" / "sample_posts.json").read_text(encoding="utf-8"))
-    topics, _ = build_launcher(cfg)  # links need no API key
-    render(
-        posts,
-        cfg,
-        warnings=["Sample data — this is an offline preview. The LinkedIn links above are real."],
-        topics=topics,
-    )
-    print(f"Sample dashboard written to {ROOT / 'site' / 'index.html'}")
+    for company in companies:
+        topics, _ = build_launcher(company.cfg)  # links need no API key
+        # mark_new=False: the sample URLs are fabricated, and letting them into
+        # the seen-history would mean real posts with those URLs never showed
+        # as new again.
+        # persist_seen=False: these URLs are fabricated. Letting them into the
+        # history would mean a real post that later used one never showed as new.
+        render(
+            posts if company.is_default else [],
+            company,
+            warnings=["Sample data — this is an offline preview. The LinkedIn links above are real."],
+            topics=topics,
+            endpoint=endpoint,
+            siblings=companies,
+            mark_new=False,
+            persist_seen=False,
+        )
+    print(f"Sample dashboard written to {companies[0].site_dir / 'index.html'}")
     return 0
 
 
-def main() -> int:
-    cfg = load_config()
+def _stale_warning(company, stored: dict | None) -> list[str]:
+    """Tell a company's page that its settings changed and a paid Refresh is
+    needed to act on them.
 
-    if "--sample" in sys.argv:
-        return _run_sample(cfg)
+    Every company gets this, not just the one a run gathered for. Without it an
+    edit to a non-gathered company's file is completely silent: the page still
+    shows the old posts and old drafts with nothing saying why.
+    """
+    if stored is None:
+        return []
+    mode, _ = store.decide_mode(company.cfg, stored)
+    if mode == store.GATHER:
+        return [
+            "Your keywords or search settings changed, but searching costs money so it "
+            "does not happen automatically. The posts below are from the previous "
+            "search — use the Refresh button above to search with the new settings."
+        ]
+    if mode == store.REDRAFT:
+        return [
+            "The voice, profile or model changed, but re-writing the comments costs "
+            "money so it does not happen automatically. The drafts below were written "
+            "with the previous settings — use the Refresh button above to redo them."
+        ]
+    return []
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("::warning::ANTHROPIC_API_KEY not set — rendering setup page.")
-        render([], cfg, warnings=[], configured=False, topics=build_launcher(cfg)[0])
-        return 0
 
-    stored = store.load()
-    mode = _mode_from_argv(sys.argv)
-    no_gather = "--no-gather" in sys.argv
+def _render_stored(company, endpoint: str, companies: list) -> None:
+    """Rebuild one company's page from whatever is already stored. Free, and
+    never touches a model — this is what the companies that were not gathered
+    for get on every run."""
+    stored = store.load(company)
+    # Topics come from the live config, never from the stored copy: they are
+    # just URLs built from the keywords, so rebuilding costs nothing and a
+    # stored copy would keep linking to a keyword that has since been edited.
+    topics = build_launcher(company.cfg)[0]
+    posts = (stored or {}).get("posts") or []
+    if not (company.cfg.get("search") or {}).get("find_posts", False):
+        posts = []
+    render(
+        posts,
+        company,
+        warnings=((stored or {}).get("warnings") or []) + _stale_warning(company, stored),
+        topics=topics,
+        usage=(stored or {}).get("usage") or {},
+        gathered_at=(stored or {}).get("generated_at"),
+        mark_new=False,
+        endpoint=endpoint,
+        siblings=companies,
+    )
+
+
+def _work(company, mode: str, no_gather: bool, usage: Usage, now: str) -> tuple:
+    """Do the paid stage for one company. Returns (posts, topics, warnings,
+    gathered_at, mode) — mode is returned because it can be downgraded."""
+    stored = store.load(company)
     warnings: list[str] = []
 
     if mode == "auto":
-        mode, reason = store.decide_mode(cfg, stored)
+        mode, reason = store.decide_mode(company.cfg, stored)
         print(f"Auto mode: {mode} — {reason}.")
     elif mode in (store.REDRAFT, store.RENDER) and stored is None:
-        print(f"::warning::No stored data to {mode} from — gathering instead.")
-        mode = store.GATHER
+        # Render and redraft are advertised as free and as "no searching". A
+        # company with nothing stored yet has nothing to render or redraft, and
+        # the honest answer is to say so — NOT to quietly upgrade to a paid
+        # search the operator did not pick. Only --auto may choose to gather.
+        print(f"::warning::Nothing stored for {company.slug} yet — {mode} has nothing to work from.")
+        warnings.append(
+            f"No posts have been gathered for {company.name} yet, so there was nothing to "
+            f"{mode}. The topic links below work already — press Refresh to search for posts."
+        )
+        mode = store.RENDER
 
-    # Searching is the only step that costs real money, so it never happens
-    # as a side effect of editing config.yml — only when someone asks for it.
-    if no_gather and mode == store.GATHER:
+    # Neither searching nor re-drafting happens as a side effect of editing a
+    # config file — both spend real money, and only the Refresh button asks for
+    # that. A redraft is ~$0.42 and used to slip through this guard, which
+    # covered gathering only; nothing in the spend caps could see it.
+    if no_gather and mode in (store.GATHER, store.REDRAFT):
         if stored is None:
             print("::warning::No stored data yet, and gathering was not requested.")
             warnings.append(
                 "No posts have been gathered yet. Use the Refresh button above to run "
                 "the first search."
             )
-        else:
+        elif mode == store.GATHER:
             print("Would gather, but --no-gather is set — rendering stored data instead.")
             warnings.append(
                 "Your keywords or search settings changed, but searching costs money so it "
                 "does not happen automatically. The posts below are from the previous "
                 "search — use the Refresh button above to search with the new settings."
             )
+        else:
+            print("Would redraft, but --no-gather is set — rendering stored data instead.")
+            warnings.append(
+                "The voice, profile or model changed, but re-writing the comments costs "
+                "money so it does not happen automatically. The drafts below were written "
+                "with the previous settings — use the Refresh button above to redo them."
+            )
         mode = store.RENDER
 
-    usage = Usage()
-    now = datetime.now(timezone.utc).isoformat()
+    # A gather against template copy pays full price for posts judged against a
+    # company that does not exist yet — expensive AND it looks like it worked.
+    if mode in (store.GATHER, store.REDRAFT) and company.is_placeholder():
+        print(f"::warning::{company.slug}: profile/voice is still the template — not spending.")
+        warnings.append(
+            f"{company.name}'s profile and voice are still the template, so nothing was "
+            f"searched for or written. Fill in {company.config_rel} — replace every "
+            f"{registry.PLACEHOLDER} — and press Refresh."
+        )
+        mode = store.RENDER
 
     if mode == store.GATHER:
         # 1. The per-topic deep links into LinkedIn's own search. Free.
-        topics, w = build_launcher(cfg)
+        topics, w = build_launcher(company.cfg)
         warnings += w
         print(f"Prepared {len(topics)} live search links.")
 
-        # 2. Searching for individual posts is optional, and off by default:
-        #    web search sees LinkedIn months late, so it cannot supply posts
-        #    recent enough to be worth commenting on. See find_posts in
-        #    config.yml.
-        if (cfg.get("search") or {}).get("find_posts", False):
-            search_posts, source = _search_provider(cfg)
+        # 2. Searching for individual posts is optional. See find_posts in the
+        #    company's config file.
+        if (company.cfg.get("search") or {}).get("find_posts", False):
+            search_posts, source = _search_provider(company.cfg)
             print(f"Searching for posts via {source}.")
             try:
-                posts, w = search_posts(cfg, usage=usage)
+                posts, w = search_posts(company.cfg, usage=usage)
                 warnings += w
                 print(f"{len(posts)} posts passed the date and keyword filters.")
-                posts, w = enrich_posts(posts, cfg, usage=usage)
+                posts, w = enrich_posts(posts, company.cfg, usage=usage)
                 warnings += w
                 gathered_at = now
             except SearchFailed as exc:
@@ -164,27 +244,83 @@ def main() -> int:
             post.pop("relevance", None)
             post.pop("reason", None)
             post.pop("comments", None)
-        topics, w = build_launcher(cfg)
+        topics, w = build_launcher(company.cfg)
         warnings += w
-        posts, w = enrich_posts(posts, cfg, usage=usage)
+        posts, w = enrich_posts(posts, company.cfg, usage=usage)
         warnings += w
 
     else:  # RENDER — stored may be absent if nothing has been gathered yet
         posts = (stored or {}).get("posts") or []
-        topics = (stored or {}).get("topics") or []
         warnings += (stored or {}).get("warnings") or []
-        gathered_at = (stored or {}).get("generated_at") or now
-        if not topics:  # nothing gathered yet — the links still work, and are free
-            topics, w = build_launcher(cfg)
-            warnings += w
+        # None, not now(): a company that has never been gathered for must not
+        # have its page claim the posts were fetched a moment ago.
+        gathered_at = (stored or {}).get("generated_at")
+        # Rebuilt from the live config rather than replayed from storage, so an
+        # edited keyword updates its LinkedIn link immediately. Free either way.
+        topics, w = build_launcher(company.cfg)
+        warnings += w
+        if not warnings:
+            warnings += _stale_warning(company, stored)
         print(f"Rendering {len(posts)} stored posts — no API calls.")
 
     # With post search off, previously-gathered posts must not keep rendering:
     # they are exactly the stale material that turning it off was meant to stop
     # showing. This applies in every mode, including a plain re-render.
-    if not (cfg.get("search") or {}).get("find_posts", False) and posts:
+    if not (company.cfg.get("search") or {}).get("find_posts", False) and posts:
         print(f"Post search is off — hiding {len(posts)} previously gathered posts.")
         posts = []
+
+    return posts, topics, warnings, gathered_at, mode, stored
+
+
+def main() -> int:
+    try:
+        reg = registry.registry()
+        all_companies = registry.load_all(reg)
+    except registry.ConfigError as exc:
+        print(f"::error::{exc}")
+        return 1
+    endpoint = (reg.get("refresh_endpoint") or "").strip()
+
+    if "--sample" in sys.argv:
+        return _run_sample(all_companies, endpoint)
+
+    mode = _mode_from_argv(sys.argv)
+    no_gather = "--no-gather" in sys.argv
+
+    # Before the --company guard below: with no key nothing can spend anyway,
+    # and the point of this branch is that a bare run still produces a page
+    # telling an admin what is missing.
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("::warning::ANTHROPIC_API_KEY not set — rendering setup page.")
+        for company in all_companies:
+            render(
+                [], company, warnings=[], configured=False,
+                topics=build_launcher(company.cfg)[0],
+                endpoint=endpoint, siblings=all_companies,
+                mark_new=False, persist_seen=False,
+            )
+        return 0
+
+    try:
+        wanted = _company_from_argv(sys.argv)
+        # Paid work must name its company. Defaulting would let a bare
+        # --gather spend on whichever company happened to be first, or on all
+        # of them, neither of which anyone asked for.
+        if wanted is None and len(all_companies) > 1 and not no_gather and mode != store.RENDER:
+            slugs = ", ".join(c.slug for c in all_companies)
+            print(f"::error::--{mode} spends money, so it needs --company. Choose one of: {slugs}.")
+            return 1
+        target = registry.select(all_companies, wanted)
+    except registry.ConfigError as exc:
+        print(f"::error::{exc}")
+        return 1
+
+    usage = Usage()
+    now = datetime.now(timezone.utc).isoformat()
+
+    print(f"── {target.name} ({target.slug}) ──")
+    posts, topics, warnings, gathered_at, mode, stored = _work(target, mode, no_gather, usage, now)
 
     # Render first so the is_new flags it sets get persisted, but save in a
     # finally: a rendering bug must not throw away searches we already paid
@@ -192,13 +328,15 @@ def main() -> int:
     try:
         render(
             posts,
-            cfg,
+            target,
             warnings=warnings,
             configured=True,
             topics=topics,
             usage=usage.summary() if mode != store.RENDER else ((stored or {}).get("usage") or {}),
             gathered_at=gathered_at,
             mark_new=(mode == store.GATHER),
+            endpoint=endpoint,
+            siblings=all_companies,
         )
     finally:
         if mode != store.RENDER:
@@ -212,21 +350,30 @@ def main() -> int:
                             merged.get("usd", 0)
                             + sum(e.get("usd", 0) for e in previous[key].values()), 4)
             store.save(
-                cfg=cfg,
+                target,
                 topics=topics,
                 posts=posts,
                 warnings=warnings,
                 usage=merged,
                 generated_at=gathered_at,
             )
-            print(f"Stored run data in {store.DATA_PATH.relative_to(ROOT)}")
+            print(f"Stored run data in {target.data_path.relative_to(ROOT)}")
+
+    # Every other company's page is rebuilt from what it already had. Free, and
+    # required: a Pages deploy replaces the entire site, so a run that published
+    # only the gathered company would 404 the rest.
+    for company in all_companies:
+        if company.slug != target.slug:
+            print(f"── {company.name} ({company.slug}) — re-rendering from stored data ──")
+            _render_stored(company, endpoint, all_companies)
 
     print()
     print(usage.report())
     print()
     for w in warnings:
         print(f"::warning::{w}")
-    print(f"Dashboard written to {ROOT / 'site' / 'index.html'}")
+    for company in all_companies:
+        print(f"Dashboard written to {company.site_dir / 'index.html'}")
     return 0
 
 

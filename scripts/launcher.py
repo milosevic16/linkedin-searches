@@ -51,7 +51,8 @@ def build_launcher(cfg: dict) -> tuple[list[dict], list[str]]:
 
     window = (cfg.get("search") or {}).get("fresh_window", "past-24h")
     if window not in WINDOWS:
-        warnings.append(f"Unknown fresh_window “{window}” in config.yml — using past-24h.")
+        where = cfg.get("config_file") or "the company's config file"
+        warnings.append(f"Unknown fresh_window “{window}” in {where} — using past-24h.")
         window = "past-24h"
 
     topics = [

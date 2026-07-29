@@ -1,34 +1,55 @@
 name: Build dashboard
 
+# The run title carries the company, and the refresh proxy reads it back to
+# work out who has spent what. Keep the "company:<slug>" shape — worker/
+# refresh-worker.js parses it, and its test suite asserts on it. A run it
+# cannot parse is charged to EVERY company rather than to none, so a broken
+# title makes the caps stricter, never laxer.
+run-name: >-
+  Dashboard ${{ github.event_name == 'workflow_dispatch'
+  && format('{0} company:{1}', inputs.mode, inputs.company)
+  || 'rebuild company:none' }}
+
 # There is deliberately NO schedule. Searching costs real money, so it only
-# happens when someone asks for it — via the "Refresh posts" button on the
-# dashboard, which links here. To go back to automatic refreshes, add:
-#   schedule:
-#     - cron: "30 5 * * 1,3,5"     # 07:30 Ljubljana, Mon/Wed/Fri
+# happens when someone asks for it — via the "Refresh posts" button on a
+# dashboard, which calls the proxy, which dispatches this.
 on:
-  workflow_dispatch:      # "Run workflow" button — what the page links to
+  workflow_dispatch:      # "Run workflow" button, and what the proxy calls
     inputs:
+      company:
+        description: "Which company to search for"
+        required: true
+        default: bloctopus
+        type: choice
+        options:
+          - bloctopus
+          - lemur
       mode:
         description: "What to run"
         required: true
         default: auto
         type: choice
         options:
-          - auto      # decide from what changed in config.yml
+          - auto      # decide from what changed in the company's config
           - gather    # search LinkedIn again (full cost)
           - redraft   # re-score stored posts (no searching)
-          - render    # rebuild the page only (free)
+          - render    # rebuild the pages only (free)
 
   push:
-    branches: [main]      # rebuild whenever config.yml (or code) changes
+    branches: [main]      # rebuild whenever a config file (or code) changes
     paths-ignore:
-      # The job commits data/latest.json back to the repo. Without this the
+      # The job commits the data files back to the repo. Without this the
       # commit would trigger another run, which would commit again, forever.
       - "data/**"
 
+# One queue for every company and every event, and NEVER cancel. A gather
+# spends real money at two vendors before it commits anything, so cancelling
+# one mid-flight burns the whole cost for no result. Serialising also keeps
+# the unrebased `git push` below safe, and there is no parallelism to win:
+# every run rebuilds and deploys the whole site anyway.
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: dashboard
+  cancel-in-progress: false
 
 jobs:
   # Building is separate from publishing so this workflow can run on a branch.
@@ -38,9 +59,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed to commit data/latest.json back
+      contents: write   # needed to commit the data files back
     steps:
+      # ref, not the default: a push run checks out the commit that TRIGGERED
+      # it, which — for a run that sat in the queue while a gather finished —
+      # predates the gather's data commit. It would then render the old posts
+      # and deploy them over the fresh ones, leaving git and the live site
+      # disagreeing until someone paid for another refresh.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - uses: actions/setup-python@v5
         with:
@@ -49,48 +77,66 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      # A push is someone editing config.yml, not a request to spend money, so
-      # it gets --no-gather: it will re-render or re-draft from stored posts,
-      # but never start a search. If the edit changed the keywords, the page
-      # says so and asks you to press Refresh. Searching happens only when the
-      # run was asked for by hand.
+      # The spend caps live in the worker and are only as good as its tests,
+      # which nothing used to run. Cheap, and it fails the build before a
+      # broken cap can reach production.
+      - name: Test the refresh proxy
+        run: node test.mjs
+        working-directory: worker
+
+      # A push is someone editing a config file, not a request to spend money,
+      # so it gets --no-gather: it re-renders every company from stored posts,
+      # but never searches and never re-drafts. If the edit changed something
+      # that needs either, the page says so and asks you to press Refresh.
+      # Spending happens only when the run was asked for by hand.
       - name: Choose build mode
         id: mode
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "flag=--${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+            echo "flag=--${{ inputs.mode }} --company ${{ inputs.company }}" >> "$GITHUB_OUTPUT"
           else
             echo "flag=--auto --no-gather" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build dashboard
+      - name: Build dashboards
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: python scripts/build.py ${{ steps.mode.outputs.flag }}
 
-      # Persist the gathered posts so later rebuilds can skip the searching.
-      # This runs on branches too: a gather is expensive enough that throwing
-      # its results away just because it ran off main means paying twice to
-      # get the same data onto main. Branch pushes don't trigger this workflow,
-      # so committing here cannot loop.
+      # Persist the gathered posts and the already-shown URLs so later rebuilds
+      # can skip the searching. This runs on branches too: a gather is expensive
+      # enough that throwing its results away just because it ran off main means
+      # paying twice to get the same data onto main. Branch pushes don't trigger
+      # this workflow, so committing here cannot loop.
       - name: Store gathered data
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Stage first: on the very first run data/latest.json is untracked,
-          # and an unstaged `git diff` reports no change for a new file.
+          # Stage first: on a company's very first run its data file is
+          # untracked, and an unstaged `git diff` reports no change for a new file.
           git add data/
           if git diff --cached --quiet -- data/; then
             echo "No change to stored data."
             exit 0
           fi
           git commit -m "Store dashboard data for $(date -u +%Y-%m-%d)"
+          # Serialised by the concurrency group above, so a conflicting push is
+          # not expected — but a human dispatching during a rebuild could still
+          # cause one, and losing it here would mean losing a paid gather.
+          for attempt in 1 2 3; do
+            git push && exit 0
+            echo "Push rejected (attempt $attempt) — rebasing onto ${{ github.ref_name }}."
+            # This branch, not a hardcoded main: on a branch run, rebasing onto
+            # main would not resolve the conflict and the loop would just retry
+            # the same rejected push until the paid gather was lost.
+            git pull --rebase origin "${{ github.ref_name }}" || exit 1
+          done
           git push
 
       # On main this artifact is what the deploy job publishes. On a branch it
-      # is just a downloadable copy of the page, so a full run can be tested
-      # without touching the live dashboard.
+      # is just a downloadable copy of the pages, so a full run can be tested
+      # without touching the live dashboards.
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
