@@ -362,31 +362,35 @@ def render(
           <div class="stat"><span class="stat-n">{n_angles}</span><span class="stat-l">comment angles</span></div>
         </div>"""
 
-    # The page is static HTML on GitHub Pages, so this cannot POST to the
-    # Actions API directly — that needs a token, and a token embedded in a
-    # public page would let anyone spend the API budget. So it links to the
-    # workflow page, where the run is two clicks away and authenticated as you.
-    refresh_html = f"""<section class="refresh">
-      <div class="refresh-text">
-        <strong>Posts are only searched for when you ask.</strong>
-        <span>Refreshing runs the searches again and rewrites every draft.
-        Takes about 7 minutes and costs roughly EUR 1.20 of API credit.</span>
-      </div>
-      <a class="refresh-btn" href="https://github.com/{_esc(repo)}/actions/workflows/dashboard.yml"
-         target="_blank" rel="noopener">Refresh posts&nbsp;↗</a>
-    </section>
-    <details class="refresh-how">
-      <summary>How to refresh</summary>
-      <ol>
-        <li>Click <strong>Refresh posts</strong> above (you need to be signed in to GitHub).</li>
-        <li>On that page, click the <strong>Run workflow</strong> dropdown on the right.</li>
-        <li>Leave the mode on <strong>gather</strong> and click the green <strong>Run workflow</strong> button.</li>
-        <li>Wait a few minutes, then reload this page.</li>
-      </ol>
-      <p>The other modes are cheaper: <strong>redraft</strong> rewrites the comments for the posts
-      already found (use it after editing your voice in config.yml), and <strong>render</strong>
-      just rebuilds this page for free.</p>
-    </details>"""
+    # The page is static HTML on a public site, so it holds no credentials.
+    # The password is typed by the visitor and checked by a proxy that owns
+    # the GitHub token; nothing secret is ever served here. Without an
+    # endpoint configured, fall back to linking at the Actions page.
+    endpoint = (cfg.get("refresh_endpoint") or "").strip()
+    if endpoint:
+        refresh_html = f"""<section class="refresh">
+          <div class="refresh-text">
+            <strong>Posts are only searched for when you ask.</strong>
+            <span>Finds posts from the last 48 hours and writes fresh drafts.
+            Takes about 5 minutes and costs roughly EUR 0.35.</span>
+          </div>
+          <form class="refresh-form" id="refresh-form" autocomplete="off">
+            <input class="refresh-pw" id="refresh-pw" type="password"
+                   placeholder="Password" aria-label="Refresh password" required>
+            <button class="refresh-btn" id="refresh-go" type="submit">Refresh</button>
+          </form>
+        </section>
+        <p class="refresh-status" id="refresh-status" role="status" aria-live="polite"></p>"""
+    else:
+        refresh_html = f"""<section class="refresh">
+          <div class="refresh-text">
+            <strong>Posts are only searched for when you ask.</strong>
+            <span>One-click refresh is not set up yet — see worker/README.md.
+            For now this opens the Actions page.</span>
+          </div>
+          <a class="refresh-btn" href="https://github.com/{_esc(repo)}/actions/workflows/dashboard.yml"
+             target="_blank" rel="noopener">Refresh posts&nbsp;↗</a>
+        </section>"""
 
     cost_note = ""
     if usage and usage.get("usd"):
@@ -443,12 +447,16 @@ header h1 {{ font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }}
 .refresh-text strong {{ font-size: 14px; }}
 .refresh-text span {{ font-size: 12.5px; color: var(--ink-2); }}
 .refresh-btn {{ flex: none; background: var(--accent); color: var(--accent-ink); text-decoration: none;
-  border-radius: 8px; padding: 10px 18px; font-size: 14px; font-weight: 650; white-space: nowrap; }}
-.refresh-how {{ margin: 0 0 18px; }}
-.refresh-how summary {{ cursor: pointer; color: var(--ink-2); font-size: 12.5px; padding-left: 2px; }}
-.refresh-how ol {{ font-size: 13px; color: var(--ink-2); margin: 8px 0; padding-left: 20px; }}
-.refresh-how li {{ margin-bottom: 3px; }}
-.refresh-how p {{ font-size: 12.5px; color: var(--ink-3); margin: 6px 0 0; }}
+  border: none; border-radius: 8px; padding: 10px 18px; font-size: 14px; font-weight: 650;
+  white-space: nowrap; cursor: pointer; font-family: inherit; }}
+.refresh-btn[disabled] {{ opacity: .55; cursor: progress; }}
+.refresh-form {{ display: flex; gap: 8px; flex: none; }}
+.refresh-pw {{ width: 130px; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px;
+  font-size: 14px; font-family: inherit; background: var(--bg); color: var(--ink); }}
+.refresh-pw:focus {{ outline: 2px solid var(--accent); outline-offset: 1px; }}
+.refresh-status {{ margin: 8px 2px 18px; font-size: 13px; font-weight: 600; min-height: 1.2em; }}
+.refresh-status.err {{ color: #b3261e; }}
+.refresh-status.ok {{ color: var(--good-ink); }}
 .topicnav {{ display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px;
   padding-bottom: 14px; border-bottom: 1px solid var(--line); }}
 .navchip {{ font-size: 12.5px; color: var(--ink-2); text-decoration: none;
@@ -531,6 +539,37 @@ code {{ background: var(--low-bg); border-radius: 5px; padding: 1px 5px; font-si
   Topics and voice live in <a href="https://github.com/{_esc(repo)}/blob/main/config.yml">config.yml</a>.</footer>
 </div>
 <script>
+const REFRESH_ENDPOINT = {json.dumps(endpoint)};
+const form = document.getElementById("refresh-form");
+if (form) {{
+  const pw = document.getElementById("refresh-pw");
+  const go = document.getElementById("refresh-go");
+  const out = document.getElementById("refresh-status");
+  const say = (msg, kind) => {{ out.textContent = msg; out.className = "refresh-status " + (kind || ""); }};
+  form.addEventListener("submit", async (e) => {{
+    e.preventDefault();
+    go.disabled = true;
+    say("Starting…");
+    try {{
+      const res = await fetch(REFRESH_ENDPOINT, {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify({{ password: pw.value }}),
+      }});
+      const data = await res.json().catch(() => ({{}}));
+      if (res.ok) {{
+        say(data.message || "Refresh started. Reload this page in about 5 minutes.", "ok");
+        pw.value = "";
+      }} else {{
+        say(data.error || ("Could not start the refresh (" + res.status + ")."), "err");
+      }}
+    }} catch (err) {{
+      say("Could not reach the refresh service. Check your connection.", "err");
+    }} finally {{
+      go.disabled = false;
+    }}
+  }});
+}}
 document.addEventListener("click", (e) => {{
   const copyBtn = e.target.closest(".copy");
   if (copyBtn) {{

@@ -168,6 +168,13 @@ min_relevance: 5
 # which is worse than the few cents scoring it costs.
 max_enriched: 150
 
+# Where the dashboard's Refresh button sends the password. This is the
+# proxy that holds the GitHub token — the token must never be in the page,
+# because the page is public and anyone could read it out. Leave empty and
+# the button falls back to linking at the GitHub Actions page.
+# Setup instructions: worker/README.md
+refresh_endpoint: ""
+
 # ── Models ────────────────────────────────────────────────────────────
 # Reusable comment angles per topic. Not a hard task, so: cheapest.
 angles_model: claude-haiku-4-5
