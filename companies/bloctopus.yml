@@ -22,31 +22,35 @@ name: Bloctopus Intelligence
 # warns that identical comments from two accounts look like bots.
 commenters: two professionals
 
-# Topics to watch. Each one becomes a live LinkedIn search link (free) plus
-# an AI-scored search of indexed posts (~1c per search).
-# Chosen for where your BUYERS and REFERRERS talk — lawyers, compliance
-# officers, CISOs and public sector — not where victims post.
+# Topics to watch. Each becomes a live LinkedIn search link (free) plus a
+# paid search of recent posts — roughly 2c per keyword per refresh.
+#
+# These are broad single terms rather than long phrases. That returns far more
+# posts per keyword, and the scoring model does the narrowing: it sees the
+# whole post text and the profile below, which a search string cannot. Cost is
+# bounded either way by search.posts_per_keyword.
 keywords:
-  # ── Referral channel: lawyers, litigation, disputes ──
-  - "crypto asset tracing litigation"
-  - "hidden crypto assets divorce"
+  # ── Core practice ──
+  - "crypto recovery"
+  - "blockchain forensics"
+  - "asset tracing"
+  - "crypto intelligence"
+
+  # ── Fraud and scam work ──
+  - "crypto scam"
+  - "crypto fraud"
+  - "investment scam"
+
+  # ── Incident response: ransomware, extortion, CISOs ──
+  - "ransomware"
+  - "crypto extortion"
+  - "crypto incident"
 
   # ── Compliance buyers: exchanges, banks, VASPs ──
-  - "crypto source of funds verification"
-  - "MiCA compliance crypto"
-  - "AML crypto exchange compliance"
-
-  # ── Ransomware / incident response buyers: CISOs, DPOs ──
-  - "ransomware incident response Europe"
-  - "NIS2 incident reporting obligations"
-  - "DORA operational resilience finance"
-
-  # ── Core practice + public sector ──
-  - "blockchain forensics investigation"
-  - "crypto fraud investigation law enforcement"
+  - "source of funds"
 
   # ── Home market (Slovenian-language posts) ──
-  - "kriptovalute prevara"
+  - "Kripto prevara"
 
 # Who is commenting, and why. Claude uses this to judge which posts deserve
 # your time and to draft comments that sound like Bloctopus.

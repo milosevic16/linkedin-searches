@@ -22,28 +22,32 @@ name: Lemur Legal
 commenters: a small specialist legal team
 
 # Topics to watch. Each becomes a live LinkedIn search link (free) plus a
-# paid search of recent posts. Chosen for where the BUYERS and REFERRERS of
-# tech-law work talk — founders mid-authorisation, VCs, and other lawyers —
-# not where consumers of legal content talk in general.
+# paid search of recent posts — roughly 2c per keyword per refresh.
+#
+# These are broad single terms rather than long phrases. That returns far more
+# posts per keyword, and the scoring model does the narrowing: it sees the
+# whole post text and the profile below, which a search string cannot. Cost is
+# bounded either way by search.posts_per_keyword.
 keywords:
   # ── MiCA & crypto: the CASP transition is the live wound in 2026 ──
-  - "MiCA CASP licence application"
-  - "crypto asset service provider authorisation"
-  - "crypto token legal opinion"
-  - "stablecoin regulation EU"
-  - "tokenisation real world assets"
+  - "MiCA"
+  - "cryptoasset"
+  - "crypto token"
+  - "whitepaper"
+  - "crypto legal opinion"
 
-  # ── Startups & deep tech ──
-  - "startup SAFE convertible funding round"
-  - "EU AI Act compliance"
-  - "deep tech startup Europe"
+  # ── Practice areas ──
+  - "tech law"
+  - "regulatory compliance"
+  - "startup law"
+  - "intellectual property rights"
+  - "finance law"
 
   # ── Defence & dual-use ──
-  - "dual use export control"
-  - "defence tech startup Europe"
+  - "defence tech law"
 
   # ── Home market (Slovenian-language posts) ──
-  - "pravno svetovanje startup"
+  - "startup pogodbe"
 
 # Who is commenting, and why. Claude uses this to judge which posts deserve
 # your time and to draft comments that sound like Lemur Legal.
