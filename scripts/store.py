@@ -32,24 +32,45 @@ def _digest(*parts) -> str:
 
 def fingerprint(cfg: dict) -> dict:
     """Two hashes: what would invalidate the search, and what would invalidate
-    the drafts. Anything not covered here only affects rendering."""
+    the drafts. Anything not covered here only affects rendering.
+
+    Both directions of error cost something. A key that is missing means an
+    edit silently does nothing — posts_per_keyword could be raised from 10 to
+    50 and the run would decide it had nothing to do. A key that is present
+    but irrelevant to the active provider means an edit triggers a paid
+    re-search that changes not one post, so the search digest only includes
+    the keys the chosen provider actually reads.
+    """
     search_cfg = cfg.get("search") or {}
+    provider = (search_cfg.get("provider") or "apify").lower()
+
+    common = [
+        cfg.get("keywords"),
+        provider,
+        search_cfg.get("find_posts"),
+        search_cfg.get("notable_max_age_hours"),
+        search_cfg.get("notable_days"),
+        search_cfg.get("include_articles"),
+    ]
+    if provider == "web":
+        specific = [search_cfg.get("searches_per_keyword"), cfg.get("search_model")]
+    else:
+        specific = [
+            search_cfg.get("posts_per_keyword"),
+            search_cfg.get("sort_by"),
+            search_cfg.get("max_usd_per_run"),
+        ]
+
     return {
-        "search": _digest(
-            cfg.get("keywords"),
-            search_cfg.get("find_posts"),
-            search_cfg.get("notable_max_age_hours"),
-            search_cfg.get("notable_days"),
-            search_cfg.get("include_articles"),
-            search_cfg.get("searches_per_keyword"),
-            cfg.get("search_model"),
-        ),
+        "search": _digest(*common, *specific),
         "draft": _digest(
             cfg.get("profile"),
             cfg.get("voice"),
             cfg.get("model"),
+            cfg.get("score_model"),
             cfg.get("angles_model"),
             cfg.get("max_enriched"),
+            cfg.get("min_relevance"),
         ),
     }
 

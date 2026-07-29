@@ -27,6 +27,7 @@ import yaml
 
 import store
 from enrich import enrich_posts
+from search_apify import SearchFailed
 from launcher import build_launcher
 from render import render
 from usage import Usage
@@ -93,7 +94,7 @@ def main() -> int:
     if mode == "auto":
         mode, reason = store.decide_mode(cfg, stored)
         print(f"Auto mode: {mode} — {reason}.")
-    elif mode in (store.REDRAFT, store.RENDER) and stored is None and not no_gather:
+    elif mode in (store.REDRAFT, store.RENDER) and stored is None:
         print(f"::warning::No stored data to {mode} from — gathering instead.")
         mode = store.GATHER
 
@@ -131,16 +132,29 @@ def main() -> int:
         if (cfg.get("search") or {}).get("find_posts", False):
             search_posts, source = _search_provider(cfg)
             print(f"Searching for posts via {source}.")
-            posts, w = search_posts(cfg, usage=usage)
-            warnings += w
-            print(f"{len(posts)} posts passed the date and keyword filters.")
-
-            posts, w = enrich_posts(posts, cfg, usage=usage)
-            warnings += w
+            try:
+                posts, w = search_posts(cfg, usage=usage)
+                warnings += w
+                print(f"{len(posts)} posts passed the date and keyword filters.")
+                posts, w = enrich_posts(posts, cfg, usage=usage)
+                warnings += w
+                gathered_at = now
+            except SearchFailed as exc:
+                # Keep what we already have. Treating a failed fetch as an
+                # empty result would replace good posts with nothing and then
+                # tell the user they were "gathered just now".
+                print(f"::warning::Search failed: {exc}")
+                posts = (stored or {}).get("posts") or []
+                gathered_at = (stored or {}).get("generated_at") or now
+                warnings.append(
+                    f"Could not fetch posts ({exc}) "
+                    + (f"— showing the {len(posts)} from the previous search."
+                       if posts else "— no previous posts to fall back on.")
+                )
         else:
             posts = []
+            gathered_at = now
             print("Post search is off (search.find_posts) — links and angles only.")
-        gathered_at = now
 
     elif mode == store.REDRAFT:
         posts = stored.get("posts") or []
@@ -182,18 +196,27 @@ def main() -> int:
             warnings=warnings,
             configured=True,
             topics=topics,
-            usage=usage.summary() if mode != store.RENDER else (stored.get("usage") or {}),
+            usage=usage.summary() if mode != store.RENDER else ((stored or {}).get("usage") or {}),
             gathered_at=gathered_at,
             mark_new=(mode == store.GATHER),
         )
     finally:
         if mode != store.RENDER:
+            merged = usage.summary()
+            if mode == store.REDRAFT:
+                previous = (stored or {}).get("usage") or {}
+                for key in ("external",):
+                    if previous.get(key) and not merged.get(key):
+                        merged[key] = previous[key]
+                        merged["usd"] = round(
+                            merged.get("usd", 0)
+                            + sum(e.get("usd", 0) for e in previous[key].values()), 4)
             store.save(
                 cfg=cfg,
                 topics=topics,
                 posts=posts,
                 warnings=warnings,
-                usage=usage.summary(),
+                usage=merged,
                 generated_at=gathered_at,
             )
             print(f"Stored run data in {store.DATA_PATH.relative_to(ROOT)}")

@@ -13,6 +13,8 @@ import json
 import os
 from urllib.parse import quote
 
+from models import output_config
+
 SEARCH_BASE = "https://www.linkedin.com/search/results/content/"
 
 # LinkedIn's own datePosted filter values.
@@ -133,7 +135,7 @@ def build_launcher(cfg: dict, usage=None, with_angles: bool = True) -> tuple[lis
                 profile=(cfg.get("profile") or "").strip(),
                 voice=(cfg.get("voice") or "").strip(),
             ),
-            output_config={"effort": "low", "format": {"type": "json_schema", "schema": _ANGLES_SCHEMA}},
+            output_config=output_config(angles_model, _ANGLES_SCHEMA),
             messages=[{"role": "user", "content": "Topics:\n" + json.dumps(keywords, ensure_ascii=False)}],
         )
     except Exception as exc:  # angles are a nice-to-have; links must still ship

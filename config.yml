@@ -136,16 +136,23 @@ search:
   # own URL — never left to the model, which cannot see a publication date.
   # Anything older, or with no verifiable date, is discarded before it costs
   # a single AI token. LinkedIn engagement is over in roughly 48 hours, so
-  # there is little point raising this much above 24.
-  notable_max_age_hours: 24
+  # LinkedIn engagement is
+  # largely over by 48 hours, which is why that is the default.
+  notable_max_age_hours: 48
 
   # How many posts to fetch per keyword. This is the cost dial for Apify:
-  # 11 keywords x 20 = 220 posts, about $0.44 a refresh, so the free $5/month
+  # NOTE: this is per keyword and the actor honours it per query, so 11 x 10
   # covers roughly 10 refreshes. Raise it to widen the net, at that rate.
-  posts_per_keyword: 20
+  posts_per_keyword: 10
 
   # newest first, so the age limit keeps the most posts
   sort_by: date
+
+  # Hard brake. The run refuses to start if the requested number of posts
+  # would cost more than this, so a slipped digit in posts_per_keyword is a
+  # refusal rather than a bill. Apify charges on posts RETURNED, so no filter
+  # downstream can undo an over-large request.
+  max_usd_per_run: 1.00
 
   include_articles: true     # also match linkedin.com/pulse articles
 

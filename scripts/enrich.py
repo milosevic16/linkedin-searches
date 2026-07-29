@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 import os
 
+from models import output_config
+
 SCORE_CHUNK = 12   # scoring emits a line per post — batches can be larger
 DRAFT_CHUNK = 6    # drafting emits three comments per post — keep batches small
 
@@ -126,14 +128,24 @@ def _payload(posts: list[dict], offset: int) -> str:
     )
 
 
+# Caching a system prompt only works above the model's minimum cacheable
+# prefix, and below it the breakpoint fails silently. The scoring prompt is
+# well under Haiku's minimum, so asking for a breakpoint there buys nothing
+# and makes the run's cache report look broken.
+_CACHE_MIN_CHARS = 5000
+
+
 def _call(client, anthropic, model, system, schema, user_text, effort, usage, step, warnings):
     """One structured-output call. Returns the parsed object, or None."""
+    block = {"type": "text", "text": system}
+    if len(system) >= _CACHE_MIN_CHARS:
+        block["cache_control"] = {"type": "ephemeral"}
     try:
         response = client.messages.create(
             model=model,
             max_tokens=8000,
-            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-            output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}},
+            system=[block],
+            output_config=output_config(model, schema, effort),
             messages=[{"role": "user", "content": user_text}],
         )
     except anthropic.RateLimitError:
@@ -196,9 +208,24 @@ def enrich_posts(posts: list[dict], cfg: dict, usage=None) -> tuple[list[dict], 
         )
         for ev in (parsed or {}).get("evaluations", []):
             idx = ev.get("id")
-            if isinstance(idx, int) and 0 <= idx < len(targets):
-                targets[idx]["relevance"] = max(0, min(10, int(ev.get("relevance", 0))))
-                targets[idx]["reason"] = str(ev.get("reason", "")).strip()
+            # Bound to THIS chunk, not the whole list: a model that echoes an
+            # id from another batch would otherwise overwrite that post's score.
+            if not isinstance(idx, int) or not (start <= idx < start + len(chunk)):
+                continue
+            try:
+                score = int(ev.get("relevance", 0))
+            except (TypeError, ValueError):
+                continue
+            targets[idx]["relevance"] = max(0, min(10, score))
+            targets[idx]["reason"] = str(ev.get("reason", "")).strip()
+
+    # Anything the scorer never reached must not look like it passed. Without
+    # this, posts beyond max_enriched render as full cards ahead of posts the
+    # model actually judged low-relevance.
+    for post in posts:
+        if not isinstance(post.get("relevance"), int):
+            post["relevance"] = 0
+            post.setdefault("reason", "Not scored — outside this run's scoring budget.")
 
     # ── Pass 2: draft only for posts that cleared the bar ─────────────
     worth_it = [p for p in targets if isinstance(p.get("relevance"), int) and p["relevance"] >= min_rel]

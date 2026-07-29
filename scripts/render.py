@@ -44,22 +44,57 @@ def _pages_base_url() -> str:
     return ""
 
 
-def _load_previous_seen() -> list[str]:
+def _load_previous_seen() -> list[str] | None:
+    """URLs already shown, or None if the history could not be read.
+
+    The distinction matters: an empty list is written back as the new
+    history, so returning [] on a failed fetch silently erases everything
+    ever shown and re-flags every post as NEW.
+    """
     base = _pages_base_url()
     if not base:
         return []
     try:
         resp = requests.get(f"{base}/data.json", timeout=10)
-        if resp.status_code == 200:
-            seen = resp.json().get("seen", [])
-            return [u for u in seen if isinstance(u, str)]
     except Exception:
-        pass
-    return []
+        return None
+    if resp.status_code == 404:
+        return []          # first deploy: genuinely nothing seen yet
+    if resp.status_code != 200:
+        return None
+    try:
+        return [u for u in resp.json().get("seen", []) if isinstance(u, str)]
+    except Exception:
+        return None
 
 
 def _esc(text: str) -> str:
     return html.escape(str(text or ""), quote=True)
+
+
+def _age_label(post: dict) -> str:
+    """How old the post is, in words. With a 48-hour window this is the single
+    most decision-relevant fact on a card: engagement decays fast enough that
+    a 40-hour-old post is a different proposition from a 2-hour-old one."""
+    hours = post.get("age_hours")
+    if not isinstance(hours, (int, float)):
+        return ""
+    if hours < 1:
+        return "just now"
+    if hours < 2:
+        return "1 hour ago"
+    if hours < 24:
+        return f"{int(hours)} hours ago"
+    days = hours / 24
+    return "yesterday" if days < 2 else f"{int(days)} days ago"
+
+
+def _safe_url(url: str) -> str:
+    """Only http(s) links reach the page. Post URLs and anything a model
+    produced are untrusted, and a javascript: URL would otherwise render as a
+    live link in the user's own page origin."""
+    text = str(url or "").strip()
+    return text if text.lower().startswith(("https://", "http://")) else "#"
 
 
 def _slug(text: str) -> str:
@@ -97,6 +132,8 @@ def _card(post: dict) -> str:
     )
     author = _esc(post.get("author") or "Unknown author")
     kind = "Article" if post.get("is_article") else "Post"
+    age = _age_label(post)
+    age_html = f' <span class="age">· {_esc(age)}</span>' if age else ""
     new_chip = '<span class="chip chip-new">NEW</span>' if post.get("is_new") else ""
     # Only the *other* topics this post matched — its own section is implied.
     extra = [k for k in (post.get("keywords") or [])[1:]]
@@ -120,10 +157,10 @@ def _card(post: dict) -> str:
       <div class="card-head">
         {score}
         <div class="card-id">
-          <div class="author">{author} <span class="kind">· {kind}</span></div>
+          <div class="author">{author} <span class="kind">· {kind}</span>{age_html}</div>
           <div class="title">{_esc(post.get("title") or post.get("url"))}</div>
         </div>
-        <a class="open" href="{_esc(post.get("url"))}" target="_blank" rel="noopener">Open&nbsp;↗</a>
+        <a class="open" href="{_esc(_safe_url(post.get("url")))}" target="_blank" rel="noopener">Open&nbsp;↗</a>
       </div>
       <p class="snippet">{_esc(post.get("snippet"))}</p>
       {reason_html}
@@ -145,7 +182,8 @@ def _group_by_topic(posts: list[dict], topics: list[dict]) -> dict[str, list[dic
     return grouped
 
 
-def _topic_section(topic: dict, posts: list[dict], min_rel: int, searching: bool = True) -> str:
+def _topic_section(topic: dict, posts: list[dict], min_rel: int,
+                   searching: bool = True, index: int = 0) -> str:
     angles = [(a.get("label") or "Angle", a.get("text")) for a in topic.get("angles") or []]
     angles_html = _drafts_block(
         angles,
@@ -185,15 +223,15 @@ def _topic_section(topic: dict, posts: list[dict], min_rel: int, searching: bool
         if n_new:
             count_bits.append(f"{n_new} new")
 
-    return f"""<section class="topic-block" id="t-{_slug(topic['keyword'])}" data-new="{1 if n_new else 0}">
+    return f"""<section class="topic-block" id="t-{index}-{_slug(topic['keyword'])}" data-new="{1 if n_new else 0}">
       <div class="topic-head">
         <div class="topic-id">
           <h2 class="topic-h">{_esc(topic['keyword'])}</h2>
           <p class="topic-meta">{_esc(" · ".join(count_bits))}</p>
         </div>
         <div class="topic-links">
-          <a class="open" href="{_esc(topic['fresh_url'])}" target="_blank" rel="noopener">{_esc(topic['window_label'])}&nbsp;↗</a>
-          <a class="open alt" href="{_esc(topic['week_url'])}" target="_blank" rel="noopener">Past week&nbsp;↗</a>
+          <a class="open" href="{_esc(_safe_url(topic['fresh_url']))}" target="_blank" rel="noopener">{_esc(topic['window_label'])}&nbsp;↗</a>
+          <a class="open alt" href="{_esc(_safe_url(topic['week_url']))}" target="_blank" rel="noopener">Past week&nbsp;↗</a>
         </div>
       </div>
       {angles_html}
@@ -235,11 +273,18 @@ def render(
     # load would silently truncate it on a render-only rebuild. Only the
     # is_new *decision* is skipped: on a rebuild the posts are unchanged, and
     # re-deciding would mark everything as already-seen and drop the flags.
-    prev_seen = _load_previous_seen()
+    loaded = _load_previous_seen()
+    history_readable = loaded is not None
+    prev_seen = loaded or []
     seen_set = set(prev_seen)
-    if mark_new:
+    if not history_readable:
+        warnings = list(warnings) + [
+            "Could not read which posts were shown last time, so NEW badges are omitted "
+            "this run. The history itself is untouched."
+        ]
+    elif mark_new:
         for p in posts:
-            p["is_new"] = p["url"] not in seen_set
+            p["is_new"] = p.get("url") not in seen_set
 
     now = datetime.now(_TZ)
     generated = now.strftime("%A, %d %b %Y · %H:%M")
@@ -277,7 +322,10 @@ def render(
         body_main = _setup_section()
     else:
         grouped = _group_by_topic(posts, topics)
-        blocks = [_topic_section(t, grouped.get(t["keyword"], []), min_rel, searching) for t in topics]
+        blocks = [
+            _topic_section(t, grouped.get(t["keyword"], []), min_rel, searching, i)
+            for i, t in enumerate(topics)
+        ]
         leftovers = grouped.get("Other matches") or []
         if leftovers:
             blocks.append(
@@ -290,7 +338,8 @@ def render(
                 </section>"""
             )
         nav = "".join(
-            f'<a class="navchip" href="#t-{_slug(t["keyword"])}">{_esc(t["keyword"])}</a>' for t in topics
+            f'<a class="navchip" href="#t-{i}-{_slug(t["keyword"])}">{_esc(t["keyword"])}</a>'
+            for i, t in enumerate(topics)
         )
         body_main = f"""<nav class="topicnav">{nav}</nav>
         <div class="filters">
@@ -304,7 +353,7 @@ def render(
           <div class="stat"><span class="stat-n">{len(topics)}</span><span class="stat-l">topics</span></div>
           <div class="stat"><span class="stat-n">{len(posts)}</span><span class="stat-l">posts found</span></div>
           <div class="stat"><span class="stat-n">{n_drafted}</span><span class="stat-l">with drafts</span></div>
-          <div class="stat"><span class="stat-n">{n_new}</span><span class="stat-l">new since last run</span></div>
+          <div class="stat"><span class="stat-n">{n_new}</span><span class="stat-l">new in last gather</span></div>
         </div>"""
     else:
         n_angles = sum(len(t.get("angles") or []) for t in topics)
@@ -429,6 +478,7 @@ header h1 {{ font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }}
 .s-low, .s-none {{ background: var(--low-bg); color: var(--low-ink); }}
 .author {{ font-weight: 620; font-size: 14px; }}
 .kind {{ color: var(--ink-3); font-weight: 400; }}
+.age {{ color: var(--accent); font-weight: 600; font-size: 12.5px; }}
 .title {{ color: var(--ink-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }}
 .open {{ flex: none; background: var(--accent); color: var(--accent-ink); text-decoration: none;
@@ -470,7 +520,7 @@ code {{ background: var(--low-bg); border-radius: 5px; padding: 1px 5px; font-si
 <div class="wrap">
   <header>
     <h1>LinkedIn Comment Radar</h1>
-    <p class="sub">Your LinkedIn commenting shortlist · page built {_esc(generated)}</p>
+    <p class="sub">Your LinkedIn commenting shortlist</p>
     <p class="freshness">{_esc(freshness)}</p>
   </header>
   {stats}
@@ -508,13 +558,22 @@ document.addEventListener("click", (e) => {{
     (site / "index.html").write_text(page, encoding="utf-8")
 
     # Persist state for the next run: everything ever shown, capped.
-    merged_seen = prev_seen + [p["url"] for p in posts if p["url"] not in seen_set]
-    if len(merged_seen) > SEEN_CAP:
-        merged_seen = merged_seen[-SEEN_CAP:]
+    merged_seen = list(prev_seen)
+    if history_readable:
+        for post in posts:
+            url = post.get("url")
+            if url and url not in seen_set:
+                seen_set.add(url)
+                merged_seen.append(url)
+        if len(merged_seen) > SEEN_CAP:
+            merged_seen = merged_seen[-SEEN_CAP:]
     (site / "data.json").write_text(
         json.dumps(
             {
-                "generated_at": now.isoformat(),
+                # Deliberately the gather time, not now(): this file is
+                # published on every render, and a fresh timestamp would make
+                # identical data deploy as a different byte stream every time.
+                "generated_at": gathered_at or now.isoformat(),
                 "seen": merged_seen,
                 "posts": [
                     {k: p.get(k) for k in ("url", "author", "title", "relevance", "keywords")}
