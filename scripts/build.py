@@ -120,8 +120,8 @@ def main() -> int:
     now = datetime.now(timezone.utc).isoformat()
 
     if mode == store.GATHER:
-        # 1. Fresh half: deep links into LinkedIn's own search + reusable angles.
-        topics, w = build_launcher(cfg, usage=usage)
+        # 1. The per-topic deep links into LinkedIn's own search. Free.
+        topics, w = build_launcher(cfg)
         warnings += w
         print(f"Prepared {len(topics)} live search links.")
 
@@ -154,7 +154,7 @@ def main() -> int:
         else:
             posts = []
             gathered_at = now
-            print("Post search is off (search.find_posts) — links and angles only.")
+            print("Post search is off (search.find_posts) — links only.")
 
     elif mode == store.REDRAFT:
         posts = stored.get("posts") or []
@@ -164,7 +164,7 @@ def main() -> int:
             post.pop("relevance", None)
             post.pop("reason", None)
             post.pop("comments", None)
-        topics, w = build_launcher(cfg, usage=usage)  # angles follow the voice too
+        topics, w = build_launcher(cfg)
         warnings += w
         posts, w = enrich_posts(posts, cfg, usage=usage)
         warnings += w
@@ -175,7 +175,7 @@ def main() -> int:
         warnings += (stored or {}).get("warnings") or []
         gathered_at = (stored or {}).get("generated_at") or now
         if not topics:  # nothing gathered yet — the links still work, and are free
-            topics, w = build_launcher(cfg, with_angles=False)
+            topics, w = build_launcher(cfg)
             warnings += w
         print(f"Rendering {len(posts)} stored posts — no API calls.")
 

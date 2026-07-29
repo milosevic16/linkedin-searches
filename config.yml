@@ -176,9 +176,6 @@ max_enriched: 150
 refresh_endpoint: "https://linkedin-refresh.privat-milosevic.workers.dev"
 
 # ── Models ────────────────────────────────────────────────────────────
-# Reusable comment angles per topic. Not a hard task, so: cheapest.
-angles_model: claude-haiku-4-5
-
 # Deciding which posts are worth commenting on. Runs over every post that
 # survived the date and keyword filters, and with the real post text in
 # front of it this is an easy judgement — so also the cheapest model.

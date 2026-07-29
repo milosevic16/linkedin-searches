@@ -8,15 +8,10 @@ minutes instead of an hour of scrolling.
 button at the top of the dashboard and nothing runs until you press it. A refresh
 costs a couple of cents.
 
-The page is organised **by topic**. Each topic gets one section containing both
-of the things you need, because no single source does both jobs:
-
-Each topic gives you a **link into LinkedIn's own search**, pre-filtered to the
-last 24 hours and sorted newest-first, plus **3 reusable comment angles** to bring
-to whatever you find there.
-
-Underneath each topic sit the **posts found in the last 24 hours**, each with
-three comment drafts written for that specific post.
+The page is organised **by topic**. Each topic gives you a **link into LinkedIn's
+own search**, pre-filtered to the last 24 hours and sorted newest-first, and
+underneath it the **posts found in the last 48 hours**, each with three comment
+drafts written for that specific post.
 
 **Where the posts come from.** LinkedIn blocks crawlers, so web search is useless
 here — we measured it, and it returned nothing newer than **112 days old**. Since
@@ -43,10 +38,10 @@ LinkedIn logged in as yourself.
 ## For the two of you (daily use)
 
 1. **Bookmark the dashboard:** `https://milosevic16.github.io/linkedin-searches/`
-2. **Work one topic at a time.** Expand *"general angles"* for talking points,
-   then click **Past 24 hours ↗** to open LinkedIn's own search for that topic,
-   newest first, and comment on what's worth it.
-3. **Always adapt an angle before posting** — two accounts pasting identical
+2. **Work one topic at a time.** Read the posts in its section and expand a
+   post's drafts. Or click **Past 24 hours ↗** to open LinkedIn's own search for
+   that topic, newest first, and comment on what's worth it there.
+3. **Always adapt a draft before posting** — two accounts pasting identical
    comments is the fastest way to look like bots.
 5. Want it refreshed right now? Actions tab → **Build dashboard** → *Run
    workflow* → pick **gather** (needs a GitHub account with access to this repo).
@@ -66,8 +61,8 @@ so a rebuild only redoes the stage whose inputs actually changed:
 | You edit | What re-runs | Cost |
 |---|---|---|
 | wording, layout, thresholds | the page only | **free** |
-| `voice`, `profile` | rewrites the comment angles | a couple of cents |
-| `keywords` | new angles for the new topics | a couple of cents |
+| `voice`, `profile`, `model` | re-scores and re-drafts the stored posts | a couple of cents |
+| `keywords` | nothing until you press **Refresh** — new topics need a new search | **free** |
 
 So you can iterate on comment tone as often as you like without paying to search
 LinkedIn again each time. Only pressing **Refresh posts** starts a search.
@@ -134,12 +129,13 @@ scripts/build.py                  orchestrates; picks gather / redraft / render
 scripts/store.py                  data/latest.json + the fingerprint that decides
                                   which stage actually needs to re-run
 scripts/launcher.py               LinkedIn search deep-links (datePosted +
-                                  sortBy=date_posted) + general comment angles
-scripts/search_claude.py          Claude web_search tool (allowed_domains:
-                                  linkedin.com) → post URLs + snippets. Runs on
-                                  search_model (Sonnet) — it is the mechanical step
-scripts/enrich.py                 Claude (claude-opus-5, structured outputs):
-                                  relevance 0–10 + reason + 3 per-post drafts
+                                  sortBy=date_posted). Free — they are just URLs
+scripts/search_apify.py           Apify LinkedIn post search → posts, then the
+                                  hardcoded date and keyword filters
+scripts/postdate.py               decodes the post date from the URL's own ID
+scripts/enrich.py                 Claude, structured outputs: score every post
+                                  (score_model) → draft 3 comments for the ones
+                                  that clear min_relevance (model)
 scripts/usage.py                  token accounting → cost table in the build log
 scripts/render.py                 static HTML dashboard + data.json (remembers
                                   previously-shown URLs → NEW badges)

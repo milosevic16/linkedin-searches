@@ -2,228 +2,74 @@
  "generated_at": "2026-07-29T09:39:12.563802+00:00",
  "fingerprint": {
   "search": "d34688baab734b73",
-  "draft": "44291b55982fdbd0"
+  "draft": "71856a23ce7f38af"
  },
  "topics": [
   {
    "keyword": "crypto asset tracing litigation",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20asset%20tracing%20litigation&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20asset%20tracing%20litigation&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Speed destroys evidence",
-     "text": "The first 48-72 hours are critical: after that, assets move through bridges, get layered in DEXs, or hit an exchange where KYC data exists but becomes harder to compel without immediate legal process. Many litigation teams delay forensic engagement until discovery is already open—by then the trail is cold."
-    },
-    {
-     "label": "Tracing ≠ recovery",
-     "text": "A complete forensic chain-of-custody showing exactly where assets went is not the same as getting them back. You need that evidence for court, but recovery also depends on exchange cooperation, jurisdictional reach, and whether the destination is regulated. Knowing the difference shapes realistic timelines."
-    },
-    {
-     "label": "Centralised exchange choke-point",
-     "text": "If stolen or disputed crypto reached a major regulated exchange, that's where leverage exists—but only if you move fast enough and have forensic evidence a court will accept. After that, the case becomes regulatory and procedural, not technical."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20asset%20tracing%20litigation&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   },
   {
    "keyword": "hidden crypto assets divorce",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=hidden%20crypto%20assets%20divorce&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=hidden%20crypto%20assets%20divorce&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Blockchain is a paper trail",
-     "text": "Unlike bank accounts, crypto holdings leave permanent on-chain records. If someone moved assets in the years before divorce proceedings, those transactions can be traced through exchanges or self-custody wallets—provided you know what to look for and have forensic expertise to present it properly."
-    },
-    {
-     "label": "Self-custody hides nothing long",
-     "text": "A private wallet holds assets but doesn't hide the movement. If crypto was purchased, sold, or moved to an exchange at any point, there's a forensic record linked to identity, timing, and value. The technical difficulty is for the spouse claiming there's nothing; the advantage is for the one seeking evidence."
-    },
-    {
-     "label": "Valuation date matters legally",
-     "text": "Courts need a snapshot of what was owned on the cutoff date (separation, filing, valuation date) and its worth that day. Forensic evidence must show not just existence but timing and value at that specific moment—mixing that up with current holdings is a common mistake that weakens cases."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=hidden%20crypto%20assets%20divorce&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   },
   {
    "keyword": "crypto source of funds verification",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20source%20of%20funds%20verification&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20source%20of%20funds%20verification&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "AML teams need clean transaction trails",
-     "text": "Source-of-funds verification is not about price history; it's about proving the KYC on-ramp was legitimate and that the money arriving at an exchange is traceable to a genuine economic activity or prior holding. A clean chain from bank to exchange to wallet is what regulators and exchanges actually want to see."
-    },
-    {
-     "label": "Layering is the tell",
-     "text": "When funds hit an exchange and immediately move through multiple swaps, bridges, or DEXs before returning—that's a pattern that raises flags. Legitimate source-of-funds verification looks for direct, documented paths; complexity without explanation is what triggers deeper scrutiny."
-    },
-    {
-     "label": "Timing and identity alignment",
-     "text": "Source-of-funds checks fail when there's a gap between who owns the wallet and who sent the originating funds, or when timing doesn't match the stated economic activity. Forensic evidence that closes these gaps—KYC data, bank statements, transaction logs—is what actually satisfies compliance teams."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20source%20of%20funds%20verification&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   },
   {
    "keyword": "MiCA compliance crypto",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=MiCA%20compliance%20crypto&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=MiCA%20compliance%20crypto&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "VASP rules remake customer identity",
-     "text": "MiCA's customer information requirements for crypto transfers are stricter than many firms realise: you need to know not just your customer but the beneficiary on the other side. That means exchanges and custodians need forensic-grade visibility into who is moving what, and where it goes."
-    },
-    {
-     "label": "Stablecoin issuers face traceability burden",
-     "text": "MiCA treats stablecoins as payment instruments with capital and transparency rules. Issuers now need to demonstrate they can trace redemptions and identify bad actors using their coins—that's a forensic and AML problem, not just a product problem."
-    },
-    {
-     "label": "Supervision analytics expose the gaps",
-     "text": "MiCA compliance supervisors are looking at transaction patterns and counterparty risk across Europe. Firms that can't produce clean forensic evidence of their own customer flows and sanctions screening will show up in supervision analytics as high-risk. Being audit-ready before the supervisor asks is now table-stakes."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=MiCA%20compliance%20crypto&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   },
   {
    "keyword": "AML crypto exchange compliance",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=AML%20crypto%20exchange%20compliance&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=AML%20crypto%20exchange%20compliance&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Wallet clustering is not enough",
-     "text": "AML teams often group addresses by shared ownership (clustering) but stop there. Real AML work requires understanding the economic logic: why did this cluster move funds to that exchange, and can you confirm from KYC data that the two sides are the same entity? Data alone doesn't answer compliance questions."
-    },
-    {
-     "label": "Sanctions screening must be on-chain aware",
-     "text": "Screening custodian lists against wallet addresses is a common practice, but it's incomplete. Bad actors use mixers, bridges, and layering. AML teams that rely only on direct-match screening will miss funds flowing from or to sanctioned parties through intermediate hops—forensic tracing catches what screening alone misses."
-    },
-    {
-     "label": "Timing of red flags matters",
-     "text": "A transaction that looks suspicious at T+2 hours might look completely normal at T+30 days once you trace the originating source or destination. AML teams need forensic evidence available in near-real-time to make hold or escalation decisions, not post-hoc explanations after funds have moved too far."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=AML%20crypto%20exchange%20compliance&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   },
   {
    "keyword": "ransomware incident response Europe",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=ransomware%20incident%20response%20Europe&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=ransomware%20incident%20response%20Europe&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Forensics must align with legal process",
-     "text": "Under NIS2 and DORA, you're reporting to authorities anyway; your forensic evidence will eventually be scrutinised by prosecutors or regulators. Evidence collected in a way that's admissible and chain-of-custody clean from day one saves months of friction later—and makes law enforcement's job possible."
-    },
-    {
-     "label": "Timing: ransom demand to payment window",
-     "text": "Ransom payments create a permanent blockchain record, but only if they happen. The period between the demand and any payment is when freeze requests, asset recovery orders, or law enforcement action can actually make a difference. After the payment moves through an exchange or mixer, options shrink rapidly."
-    },
-    {
-     "label": "Dual mandate: pay now, trace later",
-     "text": "Organisations often make ransom payments under duress without forensic support, then ask for recovery afterward. A parallel forensic engagement during the incident gives negotiators real data on whether the group is real and previously reliable, and positions you for either recovery or prosecution evidence if the payment goes to an exchange."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=ransomware%20incident%20response%20Europe&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   },
   {
    "keyword": "NIS2 incident reporting obligations",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=NIS2%20incident%20reporting%20obligations&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=NIS2%20incident%20reporting%20obligations&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Forensic evidence is supervisory evidence",
-     "text": "NIS2 incident reporting to authorities isn't a checkbox; it's a formal record that will be reviewed by regulators and potentially law enforcement. Evidence collected under proper forensic standards—chain of custody, contemporaneous documentation, expert analysis—is what actually satisfies the obligation rather than a narrative summary."
-    },
-    {
-     "label": "24-hour reporting clock starts at discovery",
-     "text": "NIS2 requires notification within 24 hours of discovering a significant incident; the clock doesn't restart when you've fully investigated. Many organisations delay reporting to get 'complete' forensic findings, then realise they've missed the window. Early reporting with preliminary forensic findings and a detailed followup is legally sound and operationally better."
-    },
-    {
-     "label": "Crypto incidents are NIS2 incidents",
-     "text": "Ransomware payments, wallet compromises, or funds theft involving crypto are operational incidents under NIS2 scope if the organisation is in-scope. They trigger the same reporting obligations as traditional cyber incidents—and the forensic standard is the same: what can be demonstrated to the regulator with evidence."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=NIS2%20incident%20reporting%20obligations&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   },
   {
    "keyword": "DORA operational resilience finance",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=DORA%20operational%20resilience%20finance&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=DORA%20operational%20resilience%20finance&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Third-party crypto services are DORA dependencies",
-     "text": "DORA requires mapping and testing of critical third-party dependencies, including custodians, settlement layers, and wallets. If your operational resilience depends on a blockchain bridge or a crypto custodian, you need to document the failure modes and have forensic visibility into how funds actually move through that dependency."
-    },
-    {
-     "label": "Incident classification starts with forensics",
-     "text": "DORA incident reporting thresholds depend partly on impact—was it a 15-minute outage or a total breach? In crypto operations, forensic evidence of what actually happened (which addresses, which assets, which timespan) is what determines whether an incident meets DORA thresholds and what you must report."
-    },
-    {
-     "label": "Testing crypto infrastructure under DORA",
-     "text": "DORA's resilience testing requirements apply to crypto settlement and custody arrangements too. If you're testing a bridge or a decentralised exchange integration, you need forensic-grade visibility into transaction outcomes and timing under failure scenarios—which is a forensic investigation problem, not just an operational test."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=DORA%20operational%20resilience%20finance&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   },
   {
    "keyword": "blockchain forensics investigation",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=blockchain%20forensics%20investigation&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=blockchain%20forensics%20investigation&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "On-chain data is not the investigation",
-     "text": "A blockchain record shows what moved and when, but it doesn't explain why, who authorised it, or whether it was theft or legitimate transaction. Investigation means connecting on-chain evidence to off-chain facts: KYC data, email logs, device records, bank transfers. Forensics without investigation is just data archaeology."
-    },
-    {
-     "label": "Mixer and bridge opacity is not absolute",
-     "text": "Funds passing through tumblers or bridges don't disappear; they emerge somewhere, usually an exchange. The forensic job is tracing the likely path based on transaction size, timing, and token type, then confirming identity when the assets hit regulated infrastructure. Mixers delay but don't erase the trail."
-    },
-    {
-     "label": "Exchange cooperation is the leverage point",
-     "text": "A complete forensic trace pointing to a major exchange means you can compel cooperation through law enforcement, civil process, or regulatory request. But only if the evidence is court-ready and the exchange is regulated and responsive. Forensic investigations that end in an unregulated DEX or peer-to-peer transfer have no enforcement lever."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=blockchain%20forensics%20investigation&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   },
   {
    "keyword": "crypto fraud investigation law enforcement",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20fraud%20investigation%20law%20enforcement&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20fraud%20investigation%20law%20enforcement&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Evidence standard: court-ready, not just technical",
-     "text": "Law enforcement needs forensic evidence that will survive cross-examination and chain-of-custody scrutiny in court, not just a technical explanation of how fraud happened. Many private investigators hand over raw blockchain analysis that doesn't meet evidentiary standards; prosecutors can't use it without forensic re-work and expert testimony."
-    },
-    {
-     "label": "Speed of evidence preservation matters",
-     "text": "If a suspect has not yet moved funds to an exchange, law enforcement can sometimes issue a preservation order freezing them on-chain—but only in the hours before the assets are transferred. After that, the path becomes regulatory (exchange cooperation) or international (treaties, mutual legal assistance). Forensic evidence is most valuable while law enforcement still has technical options."
-    },
-    {
-     "label": "Ransomware demands create cooperation opportunities",
-     "text": "In ransomware cases, the ransom demand, negotiation logs, and payment timeline are evidence that law enforcement can use to identify the group and link demands to actual payments. Parallel forensic investigation during negotiation—confirming the group, tracing the address, preparing for law enforcement handoff—multiplies the prosecution value of the eventual payment."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=crypto%20fraud%20investigation%20law%20enforcement&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   },
   {
    "keyword": "kriptovalute prevara",
    "window_label": "Past 24 hours",
    "fresh_url": "https://www.linkedin.com/search/results/content/?keywords=kriptovalute%20prevara&datePosted=%22past-24h%22&sortBy=%22date_posted%22",
-   "week_url": "https://www.linkedin.com/search/results/content/?keywords=kriptovalute%20prevara&datePosted=%22past-week%22&sortBy=%22date_posted%22",
-   "angles": [
-    {
-     "label": "Blockchain je trajni zapis",
-     "text": "Za razliko od klasičnih prevar, kriptovalutne prevare ostavljaju večni otisak na lancu blokova. Ako je neko ukrao sredstva ili prevarom nagovorio nekoga da pošalje novac, taj transfer se nikada ne može obrisati niti promijeniti—to postaje forenzički dokaz koji se može koristiti u istražnim i sudskim procedurama."
-    },
-    {
-     "label": "Od izmjene do razmjene",
-     "text": "Većina kriptovalutnih prevara završi na reguliranoj burzi: tamo se mogu prisiliti prema zakonu ili nadzoru da otvore podatke o korisniku. Forenzička analiza koja pokazuje točnu putanju od žrtve do burze čini slučaj rješivim; analiza koja završi u nereguliranoj DEX ili peer-to-peer transakciji nema poluge za povratak."
-    },
-    {
-     "label": "Brzina je kritična",
-     "text": "Prva 48 sati nakon što su sredstva dosegla burzu su kada je dostupna najveća poluga: tehnička analiza, zahtjevi za podatke, privremene mjere. Kasnije se slučaj pretvara u regulatorna pitanja i međunarodne procedure.早 forenzička uključenost može biti razlika između mogućnosti povrata i samo dokumentacije."
-    }
-   ]
+   "week_url": "https://www.linkedin.com/search/results/content/?keywords=kriptovalute%20prevara&datePosted=%22past-week%22&sortBy=%22date_posted%22"
   }
  ],
  "posts": [

@@ -68,7 +68,6 @@ def fingerprint(cfg: dict) -> dict:
             cfg.get("voice"),
             cfg.get("model"),
             cfg.get("score_model"),
-            cfg.get("angles_model"),
             cfg.get("max_enriched"),
             cfg.get("min_relevance"),
         ),

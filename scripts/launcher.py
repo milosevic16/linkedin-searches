@@ -1,19 +1,19 @@
-"""Build the 'fresh posts' half of the dashboard.
+"""Build the per-topic links into LinkedIn's own search.
 
 Web search can't see posts from the last 48 hours (LinkedIn blocks crawlers),
 so for freshness we hand the user straight into LinkedIn's OWN search, which
-does see them — pre-filtered to recent + sorted newest-first, one click per
-keyword. We never see those posts, so instead of per-post drafts Claude
-prepares reusable comment ANGLES per topic that work on whatever they find.
+does see them — pre-filtered to recent and sorted newest-first, one click per
+keyword.
+
+This costs nothing: the links are just URLs. It used to also generate three
+reusable comment angles per topic, from a time when we could not read any post
+and so had nothing specific to write about. Posts now come with drafts written
+for them individually, which is what the angles were standing in for.
 """
 
 from __future__ import annotations
 
-import json
-import os
 from urllib.parse import quote
-
-from models import output_config
 
 SEARCH_BASE = "https://www.linkedin.com/search/results/content/"
 
@@ -23,61 +23,6 @@ WINDOWS = {
     "past-week": "Past week",
     "past-month": "Past month",
 }
-
-_ANGLES_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "topics": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "keyword": {"type": "string"},
-                    "angles": {
-                        "type": "array",
-                        "description": "3 reusable comment angles for this topic.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "label": {
-                                    "type": "string",
-                                    "description": "3-5 word name for the angle, e.g. 'The cost nobody mentions'.",
-                                },
-                                "text": {
-                                    "type": "string",
-                                    "description": "1-2 sentences they can adapt to most posts on this topic.",
-                                },
-                            },
-                            "required": ["label", "text"],
-                            "additionalProperties": False,
-                        },
-                    },
-                },
-                "required": ["keyword", "angles"],
-                "additionalProperties": False,
-            },
-        }
-    },
-    "required": ["topics"],
-    "additionalProperties": False,
-}
-
-_SYSTEM = """You prepare LinkedIn commenting strategy for two professionals.
-
-Who they are and why they comment:
-{profile}
-
-Comment voice:
-{voice}
-
-For each topic you are given, write 3 reusable comment ANGLES — perspectives \
-they can adapt to almost any post on that topic. These are not replies to a \
-specific post, so they must be general enough to fit many posts while still \
-being concrete and opinionated.
-
-A good angle contains a real position, a specific detail, or a sharp question \
-that shows domain knowledge. Avoid generic praise, avoid anything that only \
-works if the post said something particular, and avoid self-promotion."""
 
 
 def search_url(keyword: str, window: str = "past-24h", newest_first: bool = True) -> str:
@@ -90,10 +35,17 @@ def search_url(keyword: str, window: str = "past-24h", newest_first: bool = True
     return SEARCH_BASE + "?" + "&".join(params)
 
 
-def build_launcher(cfg: dict, usage=None, with_angles: bool = True) -> tuple[list[dict], list[str]]:
-    """Return (topics, warnings). Each topic: keyword, fresh_url, week_url, angles."""
+def build_launcher(cfg: dict) -> tuple[list[dict], list[str]]:
+    """Return (topics, warnings). Each topic: keyword, window_label, fresh_url,
+    week_url. No model is called, so this is free and cannot fail."""
     warnings: list[str] = []
-    keywords = [str(k).strip() for k in (cfg.get("keywords") or []) if str(k).strip()]
+
+    keywords, seen = [], set()
+    for raw in cfg.get("keywords") or []:
+        k = str(raw).strip()
+        if k and k.lower() not in seen:
+            seen.add(k.lower())
+            keywords.append(k)
     if not keywords:
         return [], warnings
 
@@ -108,60 +60,7 @@ def build_launcher(cfg: dict, usage=None, with_angles: bool = True) -> tuple[lis
             "window_label": WINDOWS[window],
             "fresh_url": search_url(k, window),
             "week_url": search_url(k, "past-week"),
-            "angles": [],
         }
         for k in keywords
     ]
-
-    # The links themselves are just URLs — free, and the useful half of this
-    # section. Only the angles cost anything, so they can be skipped.
-    if not with_angles or not os.environ.get("ANTHROPIC_API_KEY"):
-        return topics, warnings
-
-    import anthropic
-
-    client = anthropic.Anthropic()
-    # Writing three reusable talking points per topic is not a hard task, and
-    # with post search off this is the only model call a refresh makes — so it
-    # runs on the cheapest model rather than the best one. If the angles start
-    # reading as generic, raise angles_model in config.yml; the whole call is
-    # a few cents at any tier.
-    angles_model = cfg.get("angles_model") or "claude-haiku-4-5"
-    try:
-        response = client.messages.create(
-            model=angles_model,
-            max_tokens=4000,
-            system=_SYSTEM.format(
-                profile=(cfg.get("profile") or "").strip(),
-                voice=(cfg.get("voice") or "").strip(),
-            ),
-            output_config=output_config(angles_model, _ANGLES_SCHEMA),
-            messages=[{"role": "user", "content": "Topics:\n" + json.dumps(keywords, ensure_ascii=False)}],
-        )
-    except Exception as exc:  # angles are a nice-to-have; links must still ship
-        warnings.append(f"Could not prepare comment angles ({type(exc).__name__}) — links still work.")
-        return topics, warnings
-
-    if usage is not None:
-        usage.record("angles", angles_model, response)
-
-    if response.stop_reason == "refusal":
-        warnings.append("Claude declined to prepare comment angles — links still work.")
-        return topics, warnings
-
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    try:
-        parsed = json.loads(text).get("topics", [])
-    except (json.JSONDecodeError, AttributeError):
-        warnings.append("Could not read the comment angles — links still work.")
-        return topics, warnings
-
-    by_keyword = {str(t.get("keyword", "")).strip(): t.get("angles") or [] for t in parsed}
-    for topic in topics:
-        for angle in by_keyword.get(topic["keyword"], [])[:3]:
-            label = str(angle.get("label", "")).strip()
-            body = str(angle.get("text", "")).strip()
-            if body:
-                topic["angles"].append({"label": label or "Angle", "text": body})
-
     return topics, warnings

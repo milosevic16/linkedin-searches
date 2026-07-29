@@ -1,13 +1,11 @@
 """Render the dashboard: site/index.html + site/data.json.
 
 The page is organised by TOPIC. Each topic gets a deep link into LinkedIn's
-own search plus reusable comment angles to bring to whatever it turns up.
+own search, and underneath it the posts found for that topic, each with three
+drafts written for that specific post.
 
-When search.find_posts is on, individual posts found for a topic appear
-underneath it, each with three drafts written for that specific post. It is
-off by default: web search sees LinkedIn months late, so what it finds is
-never fresh enough to be worth commenting on. The angles are general because
-we cannot read the posts behind the live link — LinkedIn blocks crawlers.
+When search.find_posts is off, a topic is just its links — nothing is fetched,
+so there is nothing to draft against.
 
 site/data.json carries the URLs already shown, fetched back from the live
 Pages deploy on the next run so repeats aren't re-flagged as new.
@@ -108,7 +106,7 @@ _STYLE_LABEL = {"insight": "Insight", "question": "Question", "experience": "Exp
 
 
 def _drafts_block(items: list[dict], summary: str, open_by_default: bool) -> str:
-    """Shared markup for per-post drafts and per-topic angles."""
+    """Collapsible list of drafted comments under a post."""
     if not items:
         return ""
     rows = "".join(
@@ -184,13 +182,6 @@ def _group_by_topic(posts: list[dict], topics: list[dict]) -> dict[str, list[dic
 
 def _topic_section(topic: dict, posts: list[dict], min_rel: int,
                    searching: bool = True, index: int = 0) -> str:
-    angles = [(a.get("label") or "Angle", a.get("text")) for a in topic.get("angles") or []]
-    angles_html = _drafts_block(
-        angles,
-        f"{len(angles)} general angles — for the posts behind the link above, which we cannot read",
-        open_by_default=False,
-    )
-
     def sort_key(p: dict):
         rel = p.get("relevance")
         return (-(rel if isinstance(rel, int) else -1), 0 if p.get("is_new") else 1)
@@ -206,7 +197,7 @@ def _topic_section(topic: dict, posts: list[dict], min_rel: int,
         cards = """<p class="empty-topic">Nothing recent enough found for this topic.
         Use the link above — it queries LinkedIn directly and is always current.</p>"""
     else:
-        cards = ""  # search is off by design; the links and angles are the section
+        cards = ""  # search is off by design; the links are the whole section
 
     rest_html = ""
     if rest:
@@ -234,7 +225,6 @@ def _topic_section(topic: dict, posts: list[dict], min_rel: int,
           <a class="open alt" href="{_esc(_safe_url(topic['week_url']))}" target="_blank" rel="noopener">Past week&nbsp;↗</a>
         </div>
       </div>
-      {angles_html}
       <div class="cards">{cards}</div>
       {rest_html}
     </section>"""
@@ -356,10 +346,8 @@ def render(
           <div class="stat"><span class="stat-n">{n_new}</span><span class="stat-l">new in last gather</span></div>
         </div>"""
     else:
-        n_angles = sum(len(t.get("angles") or []) for t in topics)
         stats = f"""<div class="stats">
           <div class="stat"><span class="stat-n">{len(topics)}</span><span class="stat-l">topics to work</span></div>
-          <div class="stat"><span class="stat-n">{n_angles}</span><span class="stat-l">comment angles</span></div>
         </div>"""
 
     # The page is static HTML on a public site, so it holds no credentials.
