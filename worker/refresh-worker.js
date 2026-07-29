@@ -34,8 +34,9 @@ const COOLDOWN_MINUTES = 10;
 const MAX_REFRESHES_PER_DAY = 3;
 const MAX_REFRESHES_PER_30_DAYS = 12;
 
-// Deliberately slow to answer, so guessing the password is tedious.
-const MIN_RESPONSE_MS = Number(globalThis.__TEST_FAST__ ? 0 : 4000);
+// Deliberately slow to answer, so guessing the password is tedious. The test
+// suite sets __TEST_FAST__ to skip the wait; in Cloudflare it is undefined.
+const MIN_RESPONSE_MS = globalThis.__TEST_FAST__ ? 0 : 4000;
 
 function allowedOrigin(env) {
   return (env.ALLOWED_ORIGIN || "").replace(/\/+$/, "");
