@@ -162,8 +162,11 @@ search:
 # Posts scoring below this (0-10) are tucked into a collapsed section.
 min_relevance: 5
 
-# Cost control: at most this many posts get AI scoring + drafts per run.
-max_enriched: 30
+# Cap on posts sent for scoring. Scoring runs on the cheap model and only
+# posts clearing min_relevance go on to drafting, so this can comfortably
+# exceed what a search returns — anything above the cap renders unjudged,
+# which is worse than the few cents scoring it costs.
+max_enriched: 150
 
 # ── Models ────────────────────────────────────────────────────────────
 # Reusable comment angles per topic. Not a hard task, so: cheapest.
