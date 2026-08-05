@@ -428,3 +428,82 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
         )
 
     return list(posts.values()), warnings
+
+
+def probe(cfg: dict) -> int:
+    """Fetch real posts and report ONLY what the dating logic makes of them.
+
+    Exists to settle one question with evidence rather than inference: does a
+    reshare arrive carrying its original's id, and does taking the oldest
+    candidate therefore date it correctly? Answering that needed real actor
+    output, and a full gather costs ~$0.62 — two thirds of which is the
+    Anthropic scoring and drafting this never reaches. The Apify half alone is
+    about $0.22 and is the only part that can answer the question.
+
+    Prints, saves nothing, calls no model.
+    """
+    token = os.environ.get("APIFY_TOKEN", "").strip()
+    if not token:
+        print("::error::APIFY_TOKEN is not set — nothing to probe.")
+        return 1
+
+    keywords = [str(k).strip() for k in (cfg.get("keywords") or []) if str(k).strip()]
+    search_cfg = cfg.get("search") or {}
+    per_keyword = max(1, min(_MAX_PER_KEYWORD, int(search_cfg.get("posts_per_keyword", 10))))
+    limit_hours = max_age_hours(search_cfg)
+    expected = per_keyword * len(keywords)
+    print(f"Probing {expected} posts across {len(keywords)} keywords "
+          f"(~${expected * USD_PER_1000_POSTS / 1000:.2f}, no model calls).")
+
+    items = _call_actor(token, keywords, per_keyword, str(search_cfg.get("sort_by", "date")),
+                        source_side_limit(limit_hours), expected)
+    print(f"Apify returned {len(items)} posts.\n")
+
+    differing, disagreeing, would_have_shown = 0, 0, []
+    for raw in items:
+        if not isinstance(raw, dict):
+            continue
+        url = str(_first(raw, _URL_KEYS) or "").split("?")[0]
+        entity, share = raw.get("entityId"), raw.get("shareUrn")
+        ids_differ = (entity and share
+                      and str(share).rsplit(":", 1)[-1] != str(entity).rsplit(":", 1)[-1])
+        if ids_differ:
+            differing += 1
+
+        # What the code used to do: URL, then the FIRST id, then the first date.
+        was = post_datetime(url, _first(raw, _ID_KEYS), _first(raw, _DATE_KEYS))
+        # What it does now: every url, every id, every date — oldest wins.
+        now_ = post_datetime(url, *_every(raw, _URL_KEYS), *_every(raw, _ID_KEYS),
+                             *_every(raw, _DATE_KEYS))
+        if was and now_ and (was - now_).total_seconds() > 3600:
+            disagreeing += 1
+            old_age, new_age = age_hours(was), age_hours(now_)
+            flipped = old_age <= limit_hours < new_age
+            if flipped:
+                would_have_shown.append((raw, old_age, new_age))
+            print(f"  {'WOULD HAVE BEEN SHOWN AS FRESH' if flipped else 'dates disagree'}")
+            print(f"    author   : {_author_name(raw)}")
+            print(f"    type     : {raw.get('type')!r}   header: {str(raw.get('header'))[:60]!r}")
+            print(f"    entityId : {entity}   shareUrn: {share}")
+            print(f"    old logic: {old_age:6.1f}h old     new logic: {new_age:6.1f}h old")
+            print(f"    url      : {url[:100]}\n")
+
+    print("─" * 70)
+    print(f"posts fetched                         : {len(items)}")
+    print(f"posts whose shareUrn != entityId      : {differing}")
+    print(f"posts the two dating rules disagree on: {disagreeing}")
+    print(f"posts the OLD rule would have shown as fresh that are actually stale: "
+          f"{len(would_have_shown)}")
+    print("─" * 70)
+    if would_have_shown:
+        print("VERDICT: reshares are real, the old rule mis-dated them, and the new rule "
+              "catches them. The bug is fixed and this run is the proof.")
+    elif differing:
+        print("VERDICT: reshares exist in this haul but none was mis-dated — their ids "
+              "point at posts of the same age. The fix is harmless; the reported post "
+              "was something else. Send its URL if it recurs.")
+    else:
+        print("VERDICT: no reshares in this haul at all, so nothing here exercises the fix. "
+              "Inconclusive — not a failure. Re-probe after a day, or send the URL of any "
+              "post whose age looks wrong.")
+    return 0

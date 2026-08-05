@@ -34,6 +34,7 @@ on:
           - gather    # search LinkedIn again (full cost)
           - redraft   # re-score stored posts (no searching)
           - render    # rebuild the pages only (free)
+          - probe     # diagnose post dating; fetches but calls no model (~1/3 cost)
 
   push:
     branches: [main]      # rebuild whenever a config file (or code) changes
@@ -137,7 +138,12 @@ jobs:
       # On main this artifact is what the deploy job publishes. On a branch it
       # is just a downloadable copy of the pages, so a full run can be tested
       # without touching the live dashboards.
+      # A probe renders nothing, so its site/ is empty. Uploading that would
+      # publish an empty artifact and take BOTH dashboards down, which is a
+      # spectacular price for a diagnostic. Skip the publish instead; the probe
+      # only ever prints.
       - name: Upload site
+        if: inputs.mode != 'probe'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
@@ -151,7 +157,9 @@ jobs:
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    # inputs.mode is empty on a push, which is correctly not 'probe', so an
+    # ordinary rebuild still deploys.
+    if: github.ref == 'refs/heads/main' && inputs.mode != 'probe'
     runs-on: ubuntu-latest
     permissions:
       pages: write

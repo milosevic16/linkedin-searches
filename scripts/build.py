@@ -269,6 +269,19 @@ def main() -> int:
     if "--sample" in sys.argv:
         return _run_sample(all_companies, endpoint)
 
+    if "--probe" in sys.argv:
+        # Diagnostic only: fetches real posts, reports what the dating logic
+        # makes of them, saves nothing and calls no model. Roughly a third the
+        # cost of a gather, because the Anthropic two thirds never happen.
+        try:
+            target = registry.select(all_companies, _company_from_argv(sys.argv))
+        except registry.ConfigError as exc:
+            print(f"::error::{exc}")
+            return 1
+        from search_apify import probe
+        print(f"── {target.name} ({target.slug}) — probe ──")
+        return probe(target.cfg)
+
     mode = _mode_from_argv(sys.argv)
     no_gather = "--no-gather" in sys.argv
 
