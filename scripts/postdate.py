@@ -109,12 +109,18 @@ def _parse(value, depth: int = 0) -> datetime | None:
     return _from_bare_id(value) or _from_epoch(value) or _from_text(value)
 
 
-def post_candidates(url: str, *fallbacks) -> list[datetime]:
-    """Every publication time the sources offer, oldest first."""
+def post_candidates(*values) -> list[datetime]:
+    """Every publication time the given values offer, oldest first.
+
+    Each value is tried BOTH ways — as something containing an activity id
+    (a URL, a urn) and as a date in its own right — because the caller does
+    not always know which it has. A reshare's record carries several ids: its
+    own, and the original's, and only one of them is the date you want.
+    """
     found = []
-    if (dt := _from_activity_id(url)) is not None:
-        found.append(dt)
-    for value in fallbacks:
+    for value in values:
+        if isinstance(value, str) and (dt := _from_activity_id(value)) is not None:
+            found.append(dt)
         if (dt := _parse(value)) is not None:
             found.append(dt)
     return sorted(found)

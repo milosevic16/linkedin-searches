@@ -79,6 +79,16 @@ def _first(raw: dict, keys) -> object | None:
     return None
 
 
+def _every(raw: dict, keys) -> list:
+    """Every present value for these keys, not just the first.
+
+    Dating needs all of them. `entityId` and `shareUrn` are both ids, but on a
+    reshare they name different posts, and stopping at the first hides the one
+    that says how old the content really is.
+    """
+    return [v for k in keys if (v := raw.get(k)) not in (None, "", [], {})]
+
+
 def _as_text(value) -> str:
     """Post bodies sometimes arrive as an object rather than a string."""
     if isinstance(value, dict):
@@ -176,16 +186,28 @@ def _report_shape(items: list[dict], warnings: list[str]) -> None:
     print(f"Apify query field: {sample.get('query')!r}")
     print(f"Apify date field : {_first(sample, _DATE_KEYS)!r}")
 
-    # Reshares are the reason dates are taken as the OLDEST of every source
-    # rather than from the URL: the reshare's activity id is minutes old while
-    # the text it carries is days old. Name any field that looks like it marks
-    # one, so the next run tells us whether the actor flags them directly
-    # instead of us inferring it from a date disagreement.
+    # Reshares are why dates are taken as the OLDEST of every id, url and date
+    # the post carries: the reshare's own id is minutes old while the text it
+    # wraps is days old. Show the fields that can reveal one. ("share" not
+    # "shared" — the first version of this check looked for "shared" and so
+    # reported "none" while shareUrn and shareLinkedinUrl were sitting there.)
     reshare_fields = sorted(
         k for k in sample
-        if any(w in k.lower() for w in ("reshare", "repost", "original", "parent", "shared"))
+        if any(w in k.lower() for w in ("share", "repost", "original", "parent", "type", "header"))
     )
     print(f"Apify reshare-ish fields: {reshare_fields or 'none'}")
+    for k in ("type", "header", "entityId", "shareUrn"):
+        if k in sample:
+            print(f"  sample {k}: {str(sample[k])[:120]!r}")
+
+    # How often the two ids actually disagree. This is the number that says
+    # whether reshares are a real part of the haul or a one-off.
+    differing = sum(
+        1 for i in items
+        if isinstance(i, dict) and i.get("shareUrn") and i.get("entityId")
+        and str(i["shareUrn"]).rsplit(":", 1)[-1] != str(i["entityId"]).rsplit(":", 1)[-1]
+    )
+    print(f"Apify posts whose shareUrn differs from entityId: {differing} of {len(items)}")
 
     probe = items[:20]
     for label, keys in (("URL", _URL_KEYS), ("text", _TEXT_KEYS), ("date/id", _DATE_KEYS + _ID_KEYS)):
@@ -327,10 +349,17 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
             no_url += 1
             continue
 
-        # 1. Date filter. Every source the post offers is considered — its URL,
-        #    its id, and any date field — and the OLDEST wins, because a reshare
-        #    has a new URL wrapped around old text.
-        date_args = (url, ident, _first(raw, _DATE_KEYS))
+        # 1. Date filter. EVERY id, url and date field the post carries is
+        #    considered, and the OLDEST wins.
+        #
+        #    All of them, not the first of each: the actor returns both
+        #    `entityId` and `shareUrn`, and on a reshare those differ — the
+        #    first is the reshare, the second the original it wraps. Reading
+        #    only the first is how a six-day-old post reached the dashboard
+        #    stamped "just now". Its own `postedAt` is no help there; it
+        #    reports the reshare too.
+        date_args = (url, *_every(raw, _URL_KEYS), *_every(raw, _ID_KEYS),
+                     *_every(raw, _DATE_KEYS))
         when = post_datetime(*date_args)
         if when is None:
             undatable += 1
