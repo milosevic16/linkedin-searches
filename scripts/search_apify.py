@@ -32,7 +32,12 @@ import re
 import urllib.error
 import urllib.request
 
-from postdate import age_hours, describe_window, max_age_hours, post_datetime, source_side_limit
+from postdate import (age_hours, date_disagreement_hours, describe_window, max_age_hours,
+                      post_datetime, source_side_limit)
+
+# How far two date sources must diverge before the post is treated as a
+# reshare rather than a rounding difference between a timestamp and an id.
+_RESHARE_HOURS = 6.0
 
 ACTOR = "harvestapi~linkedin-post-search"
 ENDPOINT = f"https://api.apify.com/v2/acts/{ACTOR}/run-sync-get-dataset-items"
@@ -169,6 +174,18 @@ def _report_shape(items: list[dict], warnings: list[str]) -> None:
         return
     print(f"Apify item fields: {', '.join(sorted(sample.keys()))}")
     print(f"Apify query field: {sample.get('query')!r}")
+    print(f"Apify date field : {_first(sample, _DATE_KEYS)!r}")
+
+    # Reshares are the reason dates are taken as the OLDEST of every source
+    # rather than from the URL: the reshare's activity id is minutes old while
+    # the text it carries is days old. Name any field that looks like it marks
+    # one, so the next run tells us whether the actor flags them directly
+    # instead of us inferring it from a date disagreement.
+    reshare_fields = sorted(
+        k for k in sample
+        if any(w in k.lower() for w in ("reshare", "repost", "original", "parent", "shared"))
+    )
+    print(f"Apify reshare-ish fields: {reshare_fields or 'none'}")
 
     probe = items[:20]
     for label, keys in (("URL", _URL_KEYS), ("text", _TEXT_KEYS), ("date/id", _DATE_KEYS + _ID_KEYS)):
@@ -292,7 +309,7 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
     by_lower = {k.lower(): k for k in keywords}
     include_articles = bool(search_cfg.get("include_articles", True))
     posts: dict[str, dict] = {}
-    too_old = undatable = unmatched = no_url = articles = 0
+    too_old = undatable = unmatched = no_url = articles = reshared = 0
 
     for raw in items:
         if not isinstance(raw, dict):
@@ -310,11 +327,17 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
             no_url += 1
             continue
 
-        # 1. Date filter, against the post's own URL, id, then any date field.
-        when = post_datetime(url, ident, _first(raw, _DATE_KEYS))
+        # 1. Date filter. Every source the post offers is considered — its URL,
+        #    its id, and any date field — and the OLDEST wins, because a reshare
+        #    has a new URL wrapped around old text.
+        date_args = (url, ident, _first(raw, _DATE_KEYS))
+        when = post_datetime(*date_args)
         if when is None:
             undatable += 1
             continue
+        spread = date_disagreement_hours(*date_args)
+        if spread >= _RESHARE_HOURS:
+            reshared += 1
         age = age_hours(when)
         if age > limit_hours:
             too_old += 1
@@ -362,6 +385,13 @@ def search_posts(cfg: dict, usage=None) -> tuple[list[dict], list[str]]:
         dropped.append(f"{no_url} with no URL or id — likely a changed output format")
     if dropped:
         print(f"Filtered out: {', '.join(dropped)}.")
+    if reshared:
+        # Not an error: these are dated by their original rather than by the
+        # reshare, which is the point. Printed so the scale of it is visible —
+        # if it ever becomes most of a run, the keywords are pulling recycled
+        # content rather than fresh discussion.
+        print(f"{reshared} posts looked like reshares (their URL is newer than their "
+              f"content by {_RESHARE_HOURS:.0f}h or more); dated by the original.")
     if not posts:
         warnings.append(
             f"Apify returned {len(items)} posts but none survived filtering "

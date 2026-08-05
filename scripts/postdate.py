@@ -109,18 +109,38 @@ def _parse(value, depth: int = 0) -> datetime | None:
     return _from_bare_id(value) or _from_epoch(value) or _from_text(value)
 
 
+def post_candidates(url: str, *fallbacks) -> list[datetime]:
+    """Every publication time the sources offer, oldest first."""
+    found = []
+    if (dt := _from_activity_id(url)) is not None:
+        found.append(dt)
+    for value in fallbacks:
+        if (dt := _parse(value)) is not None:
+            found.append(dt)
+    return sorted(found)
+
+
 def post_datetime(url: str, *fallbacks) -> datetime | None:
     """Publication time for a post, or None if it cannot be established.
 
-    The URL is tried first; `fallbacks` are any id-ish or date-ish values the
-    source supplied, tried in order and in whatever shape they arrived.
+    Where sources disagree, the OLDEST wins. That is not arbitrary. A reshare
+    carries a brand-new activity id in its URL while the text is the original's,
+    so trusting the URL put six-day-old content on the dashboard stamped "just
+    now" — which is what it did. Preferring the oldest can only cost us a post
+    we would otherwise have shown; the other direction presents stale posts as
+    fresh, and a comment on a stale post is the one thing the age filter exists
+    to prevent.
     """
-    if (dt := _from_activity_id(url)) is not None:
-        return dt
-    for value in fallbacks:
-        if (dt := _parse(value)) is not None:
-            return dt
-    return None
+    candidates = post_candidates(url, *fallbacks)
+    return candidates[0] if candidates else None
+
+
+def date_disagreement_hours(url: str, *fallbacks) -> float:
+    """Spread between the oldest and newest candidate date, in hours. A large
+    value means the sources are describing different events — usually a
+    reshare, whose URL is new but whose content is not."""
+    candidates = post_candidates(url, *fallbacks)
+    return 0.0 if len(candidates) < 2 else (candidates[-1] - candidates[0]).total_seconds() / 3600
 
 
 def age_hours(when: datetime) -> float:
